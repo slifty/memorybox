@@ -4,7 +4,10 @@
 	"private": true,
 	"description": "Save a memory, view a memory",
 	"scripts": {
-		"lint": "npm run lint:tsc",
+		"format": "npm run format:prettier",
+		"format:prettier": "prettier . --write",
+		"lint": "npm run lint:prettier && npm run lint:tsc",
+		"lint:prettier": "prettier . --check",
 		"lint:tsc": "tsc -p tsconfig.json"
 	},
 	"repository": {
@@ -23,6 +26,7 @@
 	"license": "AGPL-3.0",
 	"devDependencies": {
 		"@react-native/typescript-config": "^0.87.1",
+		"prettier": "3.9.9",
 		"typescript": "~6.0.3"
 	}
 }
