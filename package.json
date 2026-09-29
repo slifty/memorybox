@@ -3,7 +3,12 @@
 	"version": "0.0.0",
 	"private": true,
 	"description": "Save a memory, view a memory",
+	"main": "src/index.ts",
 	"scripts": {
+		"start": "expo start",
+		"android": "expo run:android",
+		"ios": "expo run:ios",
+		"test": "jest",
 		"format": "npm run format:eslint && npm run format:prettier",
 		"format:eslint": "eslint . --fix || true",
 		"format:prettier": "prettier . --write",
@@ -32,19 +37,35 @@
 		"@commitlint/cli": "^21.2.3",
 		"@commitlint/config-conventional": "^21.2.3",
 		"@eslint-react/eslint-plugin": "^5.23.0",
-		"@react-native/eslint-plugin": "^0.87.1",
-		"@react-native/typescript-config": "^0.87.1",
+		"@jest/globals": "^29.7.0",
+		"@react-native/eslint-plugin": "^0.86.3",
+		"@react-native/jest-preset": "^0.86.3",
+		"@testing-library/react-native": "^14.0.1",
 		"@tsconfig/node24": "^24.0.5",
 		"@types/node": "^24.19.0",
+		"@types/react": "~19.2.2",
 		"eslint": "^10.11.0",
 		"eslint-config-prettier": "^10.1.8",
 		"eslint-import-resolver-typescript": "^4.4.5",
 		"eslint-plugin-import-x": "^4.17.1",
 		"eslint-plugin-react-hooks": "^7.1.1",
+		"expo-doctor": "^1.20.4",
+		"jest": "^29.7.0",
+		"jest-expo": "~57.0.5",
 		"prettier": "3.9.9",
+		"test-renderer": "~1.2.0",
 		"typescript": "~6.0.3"
+	},
+	"jest": {
+		"preset": "jest-expo"
 	},
 	"allowScripts": {
 		"unrs-resolver": true
+	},
+	"dependencies": {
+		"expo": "~57.0.26",
+		"expo-status-bar": "~57.0.1",
+		"react": "19.2.3",
+		"react-native": "0.86.3"
 	}
 }

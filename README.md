@@ -4,14 +4,20 @@
 
 Save a memory, view a memory.
 
-A React Native app. There is no app yet — this repository currently holds only
-the tooling it will be built with.
+A React Native app, built with [Expo](https://docs.expo.dev). So far it says
+hello, and that is all.
 
 ## Development
 
 ### Requirements
 
 - Node — see [`.node-version`](.node-version) for the expected version
+- For iOS: Xcode and CocoaPods
+- For Android: Android Studio and JDK 17
+
+The app runs as a native development build, not in Expo Go. Expo's
+[environment setup guide](https://docs.expo.dev/get-started/set-up-your-environment/?mode=development-build&buildEnv=local)
+covers the platform tools.
 
 ### Setup
 
@@ -22,6 +28,21 @@ npm install
 ```
 
 ### Common Commands
+
+To build the app and launch it in a simulator or emulator:
+
+```bash
+npm run ios
+npm run android
+```
+
+After the first build, `npm start` alone brings back the development server.
+
+To run the tests:
+
+```bash
+npm test
+```
 
 To type check, lint, and check formatting:
 

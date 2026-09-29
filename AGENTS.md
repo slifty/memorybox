@@ -9,7 +9,8 @@ memorybox is a React Native app for saving and viewing memories.
 
 **Key Technologies:**
 
-- React Native with TypeScript
+- React Native with TypeScript, on [Expo](https://docs.expo.dev)
+- Jest, with `jest-expo` and React Native Testing Library
 - ESLint 10 (flat config) built on
   [`@biffud/eslint-config`](https://www.npmjs.com/package/@biffud/eslint-config)
 - Prettier for formatting
@@ -17,16 +18,32 @@ memorybox is a React Native app for saving and viewing memories.
 
 For specific dependency versions, consult `package.json`.
 
-**Status:** tooling only. `src/index.ts` exists so that the lint and type check
-pipelines have something real to run against; it does nothing. React Native
-itself is not installed yet, and neither is a bundler, test runner, or
-deployment workflow.
+**Status:** hello world. The app renders a greeting and nothing else. There is
+no deployment workflow yet.
+
+The `ios/` and `android/` projects are not checked in. Expo generates them from
+`app.json` with `npx expo prebuild`, and they are ignored. Configure native
+behavior through `app.json` and config plugins rather than by editing those
+directories, since the next prebuild discards any edits.
 
 ## Quick Reference Commands
 
 ```bash
 # Install dependencies
 npm ci
+
+# Start Metro, the development server
+npm start
+
+# Build and launch a native development build
+npm run ios
+npm run android
+
+# Run the tests
+npm test
+
+# Check the Expo configuration and dependency versions
+npx expo-doctor
 
 # Lint everything (eslint, prettier, tsc)
 npm run lint
@@ -92,10 +109,13 @@ that is ours is the prefix, which `.github/dependabot.yml` sets.
 
 ```
 src/
-└── index.ts                           # The app entry point, currently empty
+├── App.tsx                            # The root component
+├── App.test.tsx                       # Tests sit beside what they test
+└── index.ts                           # The app entry point, registers App
 types/
 └── react-native__eslint-plugin.d.ts   # Declarations for an untyped plugin
 .commitlintrc.json                     # Commit message rules
+app.json                               # Expo configuration, and prebuild's input
 eslint.config.mjs                      # Lint configuration
 tsconfig.json                          # The app's TypeScript project
 tsconfig.node.json                     # The tooling's TypeScript project
@@ -147,16 +167,27 @@ There are two TypeScript projects, and `npm run lint:tsc` checks both:
 They are separate so that Node's globals and types never leak into app code,
 which runs on Hermes rather than Node.
 
-`tsconfig.json` extends `@react-native/typescript-config`, the base the React
-Native template uses. It clears that base's `jest` types, since no test runner
-is installed yet; restore them when one is. When `react-native` itself is
-added, keep `@react-native/typescript-config` and `@react-native/eslint-plugin`
-on the same version as it.
+`tsconfig.json` extends `expo/tsconfig.base`, and adds `strict` because that
+base does not set it. `types` is empty so that no package's globals arrive
+implicitly. That includes Jest's: tests import `describe`, `it`, and `expect`
+from `@jest/globals` instead.
 
 ## Version Constraints
 
-`.github/dependabot.yml` holds back two dependencies, and the reasons are worth
-preserving:
+`.github/dependabot.yml` holds back several dependencies, and the reasons are
+worth preserving:
+
+- **The Expo SDK sets the React Native versions.** Each SDK supports one
+  version of `react`, `react-native`, and `@types/react`, and the
+  `@react-native/*` packages must match `react-native`. Dependabot leaves them
+  alone. Upgrade them together with the SDK: bump `expo`, then run
+  `npx expo install --fix`, then `npx expo-doctor`. Dependabot holds back the
+  `expo`, `expo-status-bar`, and `jest-expo` majors for the same reason.
+- **Jest stays on 29.** `jest-expo` is built on it. Move when `jest-expo` does.
+- **`test-renderer` follows React.** Each minor version depends on a newer
+  `react-reconciler`, which has a React peer range: 1.3 requires React 19.3, for
+  example. Pick the newest minor that accepts the SDK's React version, so an SDK
+  upgrade is also the time to move it. Dependabot holds back its minors.
 
 - **TypeScript stays on 6.0.x.** `typescript-eslint` declares a peer range of
   `typescript: ">=4.8.4 <6.1.0"`, so the ceiling is 6.1, not 7. The
@@ -185,6 +216,13 @@ one job apiece for:
 - `commitlint` — commit messages follow the convention (pull requests only)
 - `npm-install` — verifies `package-lock.json` is in sync with `package.json`
 - `eslint`, `prettier`, `tsc` — the three parts of `npm run lint`
+- `jest` — the tests
+- `expo-doctor` — the Expo configuration, and dependency versions against the
+  SDK
+- `build-android`, `build-ios` — prebuild the native project, then compile a
+  release build: Gradle on Linux, and `xcodebuild` for the simulator on macOS
+  with signing disabled. Release is used because it is the configuration that
+  bundles the JavaScript, so a broken import fails the build.
 
 ## Maintaining This Document
 
