@@ -88,3 +88,69 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npm run lint:tsc
+
+  jest:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: .node-version
+          cache: npm
+      - run: npm ci
+      - run: npm test
+
+  expo-doctor:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: .node-version
+          cache: npm
+      - run: npm ci
+      - run: npx expo-doctor
+
+  build-android:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: .node-version
+          cache: npm
+      - uses: actions/setup-java@v6
+        with:
+          distribution: temurin
+          java-version: 17
+      - run: npm ci
+      - run: npx expo prebuild --platform android --no-install
+      # A release build bundles the JavaScript and compiles it to Hermes
+      # bytecode, which a debug build defers to Metro. The template signs
+      # release builds with the debug keystore, so no secrets are needed.
+      - name: Build
+        working-directory: android
+        run: ./gradlew assembleRelease
+
+  build-ios:
+    runs-on: macos-26
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: .node-version
+          cache: npm
+      - run: npm ci
+      - run: npx expo prebuild --platform ios
+      # Release rather than Debug for the same reason as Android: it is the
+      # configuration that bundles the JavaScript.
+      - name: Build
+        run: >-
+          xcodebuild
+          -workspace ios/memorybox.xcworkspace
+          -scheme memorybox
+          -configuration Release
+          -sdk iphonesimulator
+          -destination 'generic/platform=iOS Simulator'
+          CODE_SIGNING_ALLOWED=NO
+          build

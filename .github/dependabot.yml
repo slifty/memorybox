@@ -20,6 +20,30 @@ updates:
       - dependency-name: 'typescript'
         update-types:
           ['version-update:semver-major', 'version-update:semver-minor']
+      # The Expo SDK decides these versions. They move together, with
+      # `npx expo install --fix`, when the SDK is upgraded.
+      - dependency-name: 'react'
+      - dependency-name: 'react-native'
+      - dependency-name: '@react-native/*'
+      - dependency-name: '@types/react'
+        update-types:
+          ['version-update:semver-major', 'version-update:semver-minor']
+      - dependency-name: 'expo'
+        update-types: ['version-update:semver-major']
+      - dependency-name: 'expo-status-bar'
+        update-types: ['version-update:semver-major']
+      - dependency-name: 'jest-expo'
+        update-types: ['version-update:semver-major']
+      # jest-expo is built on Jest 29.
+      - dependency-name: 'jest'
+        update-types: ['version-update:semver-major']
+      - dependency-name: '@jest/globals'
+        update-types: ['version-update:semver-major']
+      # Each test-renderer minor moves to a react-reconciler that needs a newer
+      # React, so it follows the React version the SDK sets.
+      - dependency-name: 'test-renderer'
+        update-types:
+          ['version-update:semver-major', 'version-update:semver-minor']
     groups:
       npm:
         patterns:
