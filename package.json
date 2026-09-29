@@ -3,7 +3,12 @@
 	"version": "0.0.0",
 	"private": true,
 	"description": "Save a memory, view a memory",
+	"main": "src/index.ts",
 	"scripts": {
+		"start": "expo start",
+		"android": "expo run:android",
+		"ios": "expo run:ios",
+		"test": "jest",
 		"format": "npm run format:eslint && npm run format:prettier",
 		"format:eslint": "eslint . --fix || true",
 		"format:prettier": "prettier . --write",
@@ -50,6 +55,9 @@
 		"prettier": "3.9.9",
 		"test-renderer": "~1.2.0",
 		"typescript": "~6.0.3"
+	},
+	"jest": {
+		"preset": "jest-expo"
 	},
 	"allowScripts": {
 		"unrs-resolver": true
