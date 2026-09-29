@@ -7,5 +7,5 @@
 		"forceConsistentCasingInFileNames": true,
 		"types": []
 	},
-	"include": ["src"]
+	"include": ["src", "types"]
 }
