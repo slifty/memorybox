@@ -8,6 +8,7 @@
 		"format:eslint": "eslint . --fix || true",
 		"format:prettier": "prettier . --write",
 		"lint": "npm run lint:eslint && npm run lint:prettier && npm run lint:tsc",
+		"lint:commit": "commitlint --from origin/main --to HEAD --verbose",
 		"lint:eslint": "eslint . --max-warnings=0",
 		"lint:prettier": "prettier . --check",
 		"lint:tsc": "tsc -p tsconfig.json && tsc -p tsconfig.node.json"
@@ -28,6 +29,8 @@
 	"license": "AGPL-3.0",
 	"devDependencies": {
 		"@biffud/eslint-config": "~10.22.0",
+		"@commitlint/cli": "^21.2.3",
+		"@commitlint/config-conventional": "^21.2.3",
 		"@eslint-react/eslint-plugin": "^5.23.0",
 		"@react-native/eslint-plugin": "^0.87.1",
 		"@react-native/typescript-config": "^0.87.1",
