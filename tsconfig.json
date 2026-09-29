@@ -1,0 +1,11 @@
+{
+	"extends": "@react-native/typescript-config",
+	"compilerOptions": {
+		"noUncheckedIndexedAccess": true,
+		"verbatimModuleSyntax": true,
+		"erasableSyntaxOnly": true,
+		"forceConsistentCasingInFileNames": true,
+		"types": []
+	},
+	"include": ["src", "types"]
+}
