@@ -4,8 +4,9 @@
 
 Save a memory, view a memory.
 
-A React Native app, built with [Expo](https://docs.expo.dev). So far it says
-hello, and that is all.
+A React Native app, built with [Expo](https://docs.expo.dev), that keeps its
+memories in [Permanent](https://www.permanent.org). So far it can log in to a
+Permanent account, and that is all.
 
 ## Development
 
@@ -26,6 +27,11 @@ Install dependencies:
 ```bash
 npm install
 ```
+
+The app signs in against Permanent's staging environment by default, so you
+need an account there. Create one at https://app.staging.permanent.org. To use a
+different environment, copy `.env.example` to `.env` and change
+`EXPO_PUBLIC_PERMANENT_API_URL`.
 
 ### Common Commands
 

@@ -18,8 +18,33 @@ memorybox is a React Native app for saving and viewing memories.
 
 For specific dependency versions, consult `package.json`.
 
-**Status:** hello world. The app renders a greeting and nothing else. There is
-no deployment workflow yet.
+**Status:** sign-in only. The app logs a user in to
+[Permanent](https://www.permanent.org), its backend, and shows whether that
+worked. The app keeps the access token in memory only, so a restart means
+logging in again (#8 tracks remembering it). There is no deployment workflow
+yet.
+
+### Permanent
+
+Permanent's own API handles sign-in. It checks the password with FusionAuth on
+its servers and returns the FusionAuth access token. The app therefore holds no
+FusionAuth configuration and no secrets: the only setting is the API base URL,
+`EXPO_PUBLIC_PERMANENT_API_URL`. It defaults to staging, and `.env.example`
+lists the other environments. Expo inlines every `EXPO_PUBLIC_` variable into
+the bundle, so never put a secret in one.
+
+Two details of the API are easy to trip over:
+
+- **Failures come back as HTTP 200.** `isSuccessful` is false and
+  `Results[0].message[0]` holds a code such as `warning.signin.unknown`.
+- **Two-factor sign-in relies on a cookie.** `/auth/login` answers
+  `warning.auth.mfaToken` when the account needs a code. `/auth/verify` then
+  has to carry the session cookie from that login call, so requests set
+  `credentials: 'include'`. That cookie lives in the platform's native cookie
+  store, not in app state. Nothing clears it yet; logging out (#8) should.
+
+[permanent-ios](https://github.com/PermanentOrg/permanent-ios) is the reference
+client.
 
 The `ios/` and `android/` projects are not checked in. Expo generates them from
 `app.json` with `npx expo prebuild`, and they are ignored. Configure native
@@ -109,12 +134,23 @@ that is ours is the prefix, which `.github/dependabot.yml` sets.
 
 ```
 src/
+├── components/                        # The component library
+├── features/
+│   └── sign-in/                       # The sign-in flow: its state and screens
+├── permanent/                         # The Permanent API client
+│   ├── api.ts                         # Request envelopes and reading replies
+│   ├── auth.ts                        # Signing in
+│   └── testing.ts                     # Response builders for tests
 ├── App.tsx                            # The root component
-├── App.test.tsx                       # Tests sit beside what they test
-└── index.ts                           # The app entry point, registers App
+├── App.test.tsx                       # End-to-end paths through the app
+├── config.ts                          # Settings read from the environment
+├── index.ts                           # The app entry point, registers App
+└── theme.ts                           # Design tokens: color, spacing, type
 types/
+├── env.d.ts                           # The environment variables Expo inlines
 └── react-native__eslint-plugin.d.ts   # Declarations for an untyped plugin
 .commitlintrc.json                     # Commit message rules
+.env.example                           # The environment variables, documented
 app.json                               # Expo configuration, and prebuild's input
 eslint.config.mjs                      # Lint configuration
 tsconfig.json                          # The app's TypeScript project
@@ -122,6 +158,36 @@ tsconfig.node.json                     # The tooling's TypeScript project
 ```
 
 The structure will grow as the app does. Update this section when it does.
+
+### Layers
+
+Code is layered, and imports only point downward:
+
+1. **`theme.ts`** holds the design tokens. Nothing outside `components/` uses
+   it directly.
+2. **`components/`** is the component library: generic building blocks such as
+   `Screen`, `Heading`, `TextField`, and `Button`, plus hooks like `useSubmit`
+   that any form needs. Each component owns its styles, built from the theme.
+   Components know nothing about Permanent or about any feature.
+3. **`permanent/`** is the API client. It knows nothing about React.
+4. **`features/<name>/`** are the app's features. A feature keeps its state in
+   a reducer (`use<Name>Flow.ts`) that is tested as plain functions, and
+   builds its screens only from `components/`.
+5. **`App.tsx`** composes the features.
+
+The rules that follow from this:
+
+- **Screens contain no styles.** If a screen needs a look that no component
+  provides, add or extend a component rather than styling inline.
+- **A component is not tied to one use.** Name and shape it for what it is
+  (`TextButton`), not where it first appeared (`StartOverLink`).
+- **Keyboard and button submit through `useSubmit`**, so both obey the same
+  rules: no empty submits, and no second submit while one is running.
+- **A request the user has abandoned must not move the UI.** Flows count their
+  attempts and ignore results from any but the latest.
+- **Failures are values, not exceptions.** The API client returns results
+  that describe what went wrong, including a `detail` for the unexpected, and
+  the UI shows that detail so problems can be reported.
 
 ## Code Conventions
 
@@ -135,6 +201,15 @@ The structure will grow as the app does. Update this section when it does.
 3. Everything else is decided by `@biffud/eslint-config`. Do not restate or
    override its rules here without a reason specific to this project; a rule
    that would suit every project belongs upstream in that package.
+
+   The one standing exception is `@typescript-eslint/naming-convention` for
+   Permanent's wire format. Its field names (`RequestVO`, `AccountVO`) are
+   PascalCase and cannot be renamed, so files that build or check those
+   payloads disable the rule at the top, with that reason.
+
+4. **Tests sit beside what they test**, as `<name>.test.ts(x)`. Tests that
+   touch the network stub `fetch` with a default that rejects, so a test that
+   forgets to stub a request fails instead of reaching a real server.
 
 ## Linting
 

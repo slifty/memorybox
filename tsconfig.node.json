@@ -10,5 +10,5 @@
 		"checkJs": true,
 		"types": ["node"]
 	},
-	"include": ["eslint.config.mjs", "types"]
+	"include": ["eslint.config.mjs", "types/react-native__eslint-plugin.d.ts"]
 }
