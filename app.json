@@ -11,6 +11,16 @@
 		},
 		"android": {
 			"package": "com.slifty.memorybox"
-		}
+		},
+		"plugins": [
+			[
+				"expo-media-library",
+				{
+					"photosPermission": "memorybox shows you the photos you took today, so you can choose one to remember.",
+					"savePhotosPermission": false,
+					"granularPermissions": ["photo"]
+				}
+			]
+		]
 	}
 }

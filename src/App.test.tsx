@@ -15,6 +15,7 @@ import {
 } from '@testing-library/react-native';
 import { App } from './App';
 import { failure, loginSuccess, verifySuccess } from './permanent/testing';
+import { fakeLibrary, photoTakenAt, resetFakeLibrary } from './photos/testing';
 
 // End-to-end paths through the app. The pieces have their own tests: the API
 // client in permanent/, the flow's rules in features/sign-in/, and the
@@ -23,6 +24,7 @@ import { failure, loginSuccess, verifySuccess } from './permanent/testing';
 const fetchMock = jest.fn<typeof fetch>();
 
 beforeEach(() => {
+	resetFakeLibrary();
 	fetchMock.mockReset();
 	fetchMock.mockRejectedValue(new Error('Unstubbed request'));
 	jest.spyOn(globalThis, 'fetch').mockImplementation(fetchMock);
@@ -58,15 +60,28 @@ const enterCode = async (
 	await user.press(screen.getByRole('button', { name: 'Verify' }));
 };
 
+const today = (hours: number, minutes: number): Date => {
+	const time = new Date();
+	time.setHours(hours, minutes, 0, 0);
+	return time;
+};
+
+const findRemember = async (): Promise<unknown> =>
+	await screen.findByRole('button', { name: 'Remember' });
+
+const remember = async (): Promise<ReturnType<typeof userEvent.setup>> => {
+	fetchMock.mockResolvedValueOnce(loginSuccess());
+	const user = await logIn();
+	await user.press(await screen.findByRole('button', { name: 'Remember' }));
+	return user;
+};
+
 describe('App', () => {
 	it('logs in', async () => {
 		fetchMock.mockResolvedValueOnce(loginSuccess());
 		await logIn();
 
-		expect(await screen.findByText("You're logged in")).toBeOnTheScreen();
-		expect(
-			screen.getByText('Signed in to Permanent as Ada.'),
-		).toBeOnTheScreen();
+		expect(await findRemember()).toBeOnTheScreen();
 	});
 
 	it('explains rejected credentials and offers another try', async () => {
@@ -108,7 +123,7 @@ describe('App', () => {
 		await fireEvent(password, 'submitEditing');
 		answer(loginSuccess());
 
-		expect(await screen.findByText("You're logged in")).toBeOnTheScreen();
+		expect(await findRemember()).toBeOnTheScreen();
 		expect(fetchMock).toHaveBeenCalledTimes(1);
 	});
 
@@ -135,7 +150,7 @@ describe('App', () => {
 		);
 
 		await enterCode(user, '1234');
-		expect(await screen.findByText("You're logged in")).toBeOnTheScreen();
+		expect(await findRemember()).toBeOnTheScreen();
 	});
 
 	it('ignores a verification that finishes after starting over', async () => {
@@ -160,6 +175,49 @@ describe('App', () => {
 		});
 
 		expect(screen.getByText('Log in to Permanent')).toBeOnTheScreen();
-		expect(screen.queryByText("You're logged in")).not.toBeOnTheScreen();
+		expect(
+			screen.queryByRole('button', { name: 'Remember' }),
+		).not.toBeOnTheScreen();
+	});
+
+	it('remembers a photo taken today', async () => {
+		fakeLibrary.photos = [
+			photoTakenAt(today(9, 15)),
+			photoTakenAt(today(8, 5)),
+		];
+		const user = await remember();
+
+		await user.press(
+			await screen.findByRole('button', { name: /Photo taken at 9:15/v }),
+		);
+		await user.press(screen.getByRole('button', { name: 'Capture Memory' }));
+
+		expect(await screen.findByText('Done.')).toBeOnTheScreen();
+	});
+
+	it('captures nothing until a photo is chosen', async () => {
+		fakeLibrary.photos = [photoTakenAt(today(9, 15))];
+		await remember();
+
+		expect(
+			await screen.findByRole('button', { name: 'Capture Memory' }),
+		).toBeDisabled();
+	});
+
+	it('says when no photos were taken today', async () => {
+		await remember();
+
+		expect(await screen.findByText('No photos yet today')).toBeOnTheScreen();
+	});
+
+	it('explains when it may not see the photos', async () => {
+		fakeLibrary.accessGranted = false;
+		const user = await remember();
+
+		expect(
+			await screen.findByText('memorybox cannot see your photos'),
+		).toBeOnTheScreen();
+		await user.press(screen.getByRole('button', { name: 'Back' }));
+		expect(await findRemember()).toBeOnTheScreen();
 	});
 });

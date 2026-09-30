@@ -18,11 +18,12 @@ memorybox is a React Native app for saving and viewing memories.
 
 For specific dependency versions, consult `package.json`.
 
-**Status:** sign-in only. The app logs a user in to
-[Permanent](https://www.permanent.org), its backend, and shows whether that
-worked. The app keeps the access token in memory only, so a restart means
-logging in again (#8 tracks remembering it). There is no deployment workflow
-yet.
+**Status:** the app logs a user in to [Permanent](https://www.permanent.org),
+its backend, then lets them pick one of the photos they took today and capture
+it as a memory. Capturing does not save anything yet: `saveMemory` in
+`src/permanent/memories.ts` is a placeholder that reports success. The app
+keeps the access token in memory only, so a restart means logging in again (#8
+tracks remembering it). There is no deployment workflow yet.
 
 ### Permanent
 
@@ -134,13 +135,19 @@ that is ours is the prefix, which `.github/dependabot.yml` sets.
 
 ```
 src/
+├── __mocks__/                         # Jest mocks for native packages
 ├── components/                        # The component library
 ├── features/
+│   ├── remember/                      # Choosing a photo and capturing it
 │   └── sign-in/                       # The sign-in flow: its state and screens
 ├── permanent/                         # The Permanent API client
 │   ├── api.ts                         # Request envelopes and reading replies
 │   ├── auth.ts                        # Signing in
+│   ├── memories.ts                    # Saving memories (a placeholder)
 │   └── testing.ts                     # Response builders for tests
+├── photos/                            # The device's photo library
+│   ├── library.ts                     # Finding today's photos
+│   └── testing.ts                     # The fake library tests control
 ├── App.tsx                            # The root component
 ├── App.test.tsx                       # End-to-end paths through the app
 ├── config.ts                          # Settings read from the environment
@@ -169,7 +176,8 @@ Code is layered, and imports only point downward:
    `Screen`, `Heading`, `TextField`, and `Button`, plus hooks like `useSubmit`
    that any form needs. Each component owns its styles, built from the theme.
    Components know nothing about Permanent or about any feature.
-3. **`permanent/`** is the API client. It knows nothing about React.
+3. **`permanent/`** is the API client, and **`photos/`** reads the device's
+   photo library. Neither knows anything about React.
 4. **`features/<name>/`** are the app's features. A feature keeps its state in
    a reducer (`use<Name>Flow.ts`) that is tested as plain functions, and
    builds its screens only from `components/`.
@@ -210,6 +218,11 @@ The rules that follow from this:
 4. **Tests sit beside what they test**, as `<name>.test.ts(x)`. Tests that
    touch the network stub `fetch` with a default that rejects, so a test that
    forgets to stub a request fails instead of reaching a real server.
+
+5. **Native modules are mocked in `src/__mocks__/`**, which Jest applies
+   automatically because `roots` is `src`. The `expo-media-library` mock reads
+   from the fake library in `src/photos/testing.ts`. Tests arrange that fake
+   and reset it in `beforeEach`.
 
 ## Linting
 
