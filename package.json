@@ -57,13 +57,17 @@
 		"typescript": "~6.0.3"
 	},
 	"jest": {
-		"preset": "jest-expo"
+		"preset": "jest-expo",
+		"roots": [
+			"<rootDir>/src"
+		]
 	},
 	"allowScripts": {
 		"unrs-resolver": true
 	},
 	"dependencies": {
 		"expo": "~57.0.26",
+		"expo-media-library": "~57.0.5",
 		"expo-status-bar": "~57.0.1",
 		"react": "19.2.3",
 		"react-native": "0.86.3"

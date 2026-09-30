@@ -1,11 +1,17 @@
 import { CodeScreen } from './CodeScreen';
 import { CredentialsScreen } from './CredentialsScreen';
 import { FailureScreen } from './FailureScreen';
-import { SignedInScreen } from './SignedInScreen';
 import { useSignInFlow } from './useSignInFlow';
+import type { Session } from '../../permanent/auth';
 import type { ReactElement } from 'react';
 
-export const SignInFlow = (): ReactElement => {
+interface SignInFlowProps {
+	renderSignedIn: (session: Session) => ReactElement;
+}
+
+export const SignInFlow = ({
+	renderSignedIn,
+}: SignInFlowProps): ReactElement => {
 	const { state, submitCredentials, submitCode, startOver } = useSignInFlow();
 
 	switch (state.step) {
@@ -21,7 +27,7 @@ export const SignInFlow = (): ReactElement => {
 				/>
 			);
 		case 'signed-in':
-			return <SignedInScreen account={state.session.account} />;
+			return renderSignedIn(state.session);
 		case 'failed':
 			return (
 				<FailureScreen
