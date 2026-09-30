@@ -19,8 +19,9 @@ memorybox is a React Native app for saving and viewing memories.
 For specific dependency versions, consult `package.json`.
 
 **Status:** the app logs a user in to [Permanent](https://www.permanent.org),
-its backend, then lets them pick one of the photos they took today and capture
-it as a memory. Capturing does not save anything yet: `saveMemory` in
+its backend, and makes sure the Memorybox folder exists in their default
+archive's My Files. It then lets them pick one of the photos they took today and
+capture it as a memory. Capturing does not save anything yet: `saveMemory` in
 `src/permanent/memories.ts` is a placeholder that reports success. The app
 keeps the access token in memory only, so a restart means logging in again (#8
 tracks remembering it). There is no deployment workflow yet.
@@ -29,14 +30,36 @@ tracks remembering it). There is no deployment workflow yet.
 
 Permanent's own API handles sign-in. It checks the password with FusionAuth on
 its servers and returns the FusionAuth access token. The app therefore holds no
-FusionAuth configuration and no secrets: the only setting is the API base URL,
-`EXPO_PUBLIC_PERMANENT_API_URL`. It defaults to staging, and `.env.example`
-lists the other environments. Expo inlines every `EXPO_PUBLIC_` variable into
+FusionAuth configuration and no secrets. The only settings are two base URLs:
+`EXPO_PUBLIC_PERMANENT_API_URL` for the API, and
+`EXPO_PUBLIC_PERMANENT_STELA_URL` for stela, which runs on its own host. Both
+default to staging, and `.env.example` lists the other environments. Expo inlines every `EXPO_PUBLIC_` variable into
 the bundle, so never put a secret in one.
 
-Two details of the API are easy to trip over:
+The app talks to Permanent in three ways:
 
-- **Failures come back as HTTP 200.** `isSuccessful` is false and
+- **Sign-in** uses the API's original format: every request is wrapped as
+  `{ RequestVO: { data: [payload] } }`, and replies arrive in a `Results`
+  envelope.
+- **Everything else on the API**, such as creating folders and uploading
+  files, uses its version 2 format instead. Requests are plain JSON with the
+  access token as a `Bearer` header and `Request-Version: 2`. Replies are the
+  bare object, and failures are HTTP errors. No cookie is involved.
+- **Stela** is plain REST with the same `Bearer` header. The app reads
+  archives and folder contents from it, but it cannot create anything.
+
+Uploading a file takes three calls: `/record/getPresignedUrl` for an S3 form,
+a post of that form to S3, then `/record/registerRecord`.
+
+**The Memorybox folder.** After sign-in, `prepareMemorybox` finds or creates a
+folder named `Memorybox` in My Files. A folder the app creates gets a
+`.memorybox` file. An empty folder without one is a setup that was interrupted,
+and the app finishes it. Any other `Memorybox` folder without the file belongs
+to someone else, so the app stops rather than writing into it.
+
+Details of the API that are easy to trip over:
+
+- **Sign-in failures come back as HTTP 200.** `isSuccessful` is false and
   `Results[0].message[0]` holds a code such as `warning.signin.unknown`.
 - **Two-factor sign-in relies on a cookie.** `/auth/login` answers
   `warning.auth.mfaToken` when the account needs a code. `/auth/verify` then
@@ -45,7 +68,12 @@ Two details of the API are easy to trip over:
   store, not in app state. Nothing clears it yet; logging out (#8) should.
 
 [permanent-ios](https://github.com/PermanentOrg/permanent-ios) is the reference
-client.
+for sign-in. For the rest of the API, the references are Permanent's
+[SDK](https://github.com/PermanentOrg/permanent-sdk), its
+[web app](https://github.com/PermanentOrg/web-app), and the API specification in
+[stela](https://github.com/PermanentOrg/stela). The SDK is the closest match to
+how this app calls the API, but it is built for Node and cannot run in React
+Native.
 
 The `ios/` and `android/` projects are not checked in. Expo generates them from
 `app.json` with `npx expo prebuild`, and they are ignored. Configure native
@@ -139,12 +167,16 @@ src/
 ├── components/                        # The component library
 ├── features/
 │   ├── remember/                      # Choosing a photo and capturing it
+│   ├── set-up/                        # Preparing the Memorybox folder
 │   └── sign-in/                       # The sign-in flow: its state and screens
 ├── permanent/                         # The Permanent API client
-│   ├── api.ts                         # Request envelopes and reading replies
+│   ├── api.ts                         # Transports, and reading replies
 │   ├── auth.ts                        # Signing in
+│   ├── folders.ts                     # Finding, listing, and creating folders
+│   ├── memorybox.ts                   # Finding or creating the Memorybox folder
 │   ├── memories.ts                    # Saving memories (a placeholder)
-│   └── testing.ts                     # Response builders for tests
+│   ├── records.ts                     # Uploading files
+│   └── testing.ts                     # Response builders, and a fake server
 ├── photos/                            # The device's photo library
 │   ├── library.ts                     # Finding today's photos
 │   └── testing.ts                     # The fake library tests control
@@ -217,7 +249,11 @@ The rules that follow from this:
 
 4. **Tests sit beside what they test**, as `<name>.test.ts(x)`. Tests that
    touch the network stub `fetch` with a default that rejects, so a test that
-   forgets to stub a request fails instead of reaching a real server.
+   forgets to stub a request fails instead of reaching a real server. That
+   default can be `fakePermanentFetch` from `src/permanent/testing.ts`, a fake
+   server that answers the Memorybox setup calls and rejects everything else.
+   Tests arrange its state through `fakePermanent` and reset it in
+   `beforeEach`.
 
 5. **Native modules are mocked in `src/__mocks__/`**, which Jest applies
    automatically because `roots` is `src`. The `expo-media-library` mock reads

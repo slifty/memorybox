@@ -1,4 +1,5 @@
 import type { Session } from './auth';
+import type { Folder } from './folders';
 
 export interface Memory {
 	photoUri: string;
@@ -10,5 +11,6 @@ export type SaveMemoryResult =
 
 export const saveMemory = async (
 	_session: Session,
+	_memorybox: Folder,
 	_memory: Memory,
 ): Promise<SaveMemoryResult> => await Promise.resolve({ outcome: 'saved' });

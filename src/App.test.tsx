@@ -14,7 +14,15 @@ import {
 	userEvent,
 } from '@testing-library/react-native';
 import { App } from './App';
-import { failure, loginSuccess, verifySuccess } from './permanent/testing';
+import { permanentApiUrl } from './config';
+import {
+	failure,
+	fakePermanent,
+	fakePermanentFetch,
+	loginSuccess,
+	resetFakePermanent,
+	verifySuccess,
+} from './permanent/testing';
 import { fakeLibrary, photoTakenAt, resetFakeLibrary } from './photos/testing';
 
 // End-to-end paths through the app. The pieces have their own tests: the API
@@ -25,8 +33,9 @@ const fetchMock = jest.fn<typeof fetch>();
 
 beforeEach(() => {
 	resetFakeLibrary();
+	resetFakePermanent();
 	fetchMock.mockReset();
-	fetchMock.mockRejectedValue(new Error('Unstubbed request'));
+	fetchMock.mockImplementation(fakePermanentFetch);
 	jest.spyOn(globalThis, 'fetch').mockImplementation(fetchMock);
 });
 
@@ -84,6 +93,48 @@ describe('App', () => {
 		expect(await findRemember()).toBeOnTheScreen();
 	});
 
+	it('creates the Memorybox folder on first use', async () => {
+		fakePermanent.memorybox = 'missing';
+		fetchMock.mockResolvedValueOnce(loginSuccess());
+		await logIn();
+
+		expect(await findRemember()).toBeOnTheScreen();
+		expect(fakePermanent.memorybox).toBe('claimed');
+	});
+
+	it('will not use a Memorybox folder it did not create', async () => {
+		fakePermanent.memorybox = 'unclaimed';
+		fetchMock.mockResolvedValueOnce(loginSuccess());
+		const user = await logIn();
+
+		expect(await screen.findByText('Setup failed')).toBeOnTheScreen();
+
+		fakePermanent.memorybox = 'claimed';
+		await user.press(screen.getByRole('button', { name: 'Try again' }));
+		expect(await findRemember()).toBeOnTheScreen();
+	});
+
+	it('finishes an interrupted setup when tried again', async () => {
+		fakePermanent.memorybox = 'missing';
+		fakePermanent.failingPath = '/record/registerRecord';
+		fetchMock.mockResolvedValueOnce(loginSuccess());
+		const user = await logIn();
+
+		expect(await screen.findByText('Setup failed')).toBeOnTheScreen();
+
+		fakePermanent.failingPath = undefined;
+		await user.press(screen.getByRole('button', { name: 'Try again' }));
+		expect(await findRemember()).toBeOnTheScreen();
+	});
+
+	it('shows what went wrong when setup fails', async () => {
+		fakePermanent.failingPath = '/accounts/me';
+		fetchMock.mockResolvedValueOnce(loginSuccess());
+		await logIn();
+
+		expect(await screen.findByText('Details: HTTP 500')).toBeOnTheScreen();
+	});
+
 	it('explains rejected credentials and offers another try', async () => {
 		fetchMock.mockResolvedValueOnce(failure('warning.signin.unknown'));
 		const user = await logIn();
@@ -124,7 +175,11 @@ describe('App', () => {
 		answer(loginSuccess());
 
 		expect(await findRemember()).toBeOnTheScreen();
-		expect(fetchMock).toHaveBeenCalledTimes(1);
+		expect(
+			fetchMock.mock.calls.filter(
+				([url]) => url === `${permanentApiUrl}/auth/login`,
+			),
+		).toHaveLength(1);
 	});
 
 	it('does not submit empty credentials from the keyboard', async () => {
