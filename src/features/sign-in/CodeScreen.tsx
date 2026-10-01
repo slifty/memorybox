@@ -3,7 +3,6 @@ import { BodyText } from '../../components/BodyText';
 import { Button } from '../../components/Button';
 import { Heading } from '../../components/Heading';
 import { Screen } from '../../components/Screen';
-import { TextButton } from '../../components/TextButton';
 import { TextField } from '../../components/TextField';
 import { useSubmit } from '../../components/useSubmit';
 import type { CodeError } from './useSignInFlow';
@@ -55,7 +54,7 @@ export const CodeScreen = ({
 				label="Verify"
 				onPress={submit}
 			/>
-			<TextButton label="Start over" onPress={onStartOver} />
+			<Button label="Start over" onPress={onStartOver} />
 		</Screen>
 	);
 };

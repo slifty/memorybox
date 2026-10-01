@@ -3,7 +3,6 @@ import { Button } from '../../components/Button';
 import { Heading } from '../../components/Heading';
 import { PhotoGrid } from '../../components/PhotoGrid';
 import { Screen } from '../../components/Screen';
-import { TextButton } from '../../components/TextButton';
 import { useSubmit } from '../../components/useSubmit';
 import type { Photo } from '../../photos/library';
 import type { ReactElement } from 'react';
@@ -50,7 +49,7 @@ export const PhotosScreen = ({
 				label="Capture Memory"
 				onPress={submit}
 			/>
-			<TextButton label="Back" onPress={onBack} />
+			<Button label="Back" onPress={onBack} />
 		</Screen>
 	);
 };
