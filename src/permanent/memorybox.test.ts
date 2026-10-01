@@ -213,6 +213,12 @@ describe('prepareMemorybox', () => {
 		},
 	);
 
+	it('reports an expired token as signed out', async () => {
+		fakePermanent.tokenExpired = true;
+
+		expect(await prepareMemorybox(session)).toEqual({ outcome: 'signed-out' });
+	});
+
 	it('explains a network failure', async () => {
 		fetchMock.mockRejectedValueOnce(new TypeError('Network request failed'));
 

@@ -13,7 +13,7 @@ const styles = StyleSheet.create({
 });
 
 interface ScreenProps {
-	children: ReactNode;
+	children?: ReactNode;
 }
 
 // The outermost container of every screen.

@@ -2,6 +2,7 @@
 
 /* eslint-disable @typescript-eslint/naming-convention --
    Permanent's API names its fields in PascalCase (`Results`, `AccountVO`). */
+import { HTTP_STATUS } from '@pdc/http-status-codes';
 import { permanentApiUrl, permanentStelaUrl } from '../config';
 
 const respond = (body: unknown, status = 200): Response =>
@@ -75,11 +76,24 @@ export const fakeFiles: FakeFiles = {
 	uploadBody: '',
 };
 
+interface FakeSecureStore {
+	items: Map<string, string>;
+	failure: Error | undefined;
+	writesFinish: Promise<void>;
+}
+
+export const fakeSecureStore: FakeSecureStore = {
+	items: new Map(),
+	failure: undefined,
+	writesFinish: Promise.resolve(),
+};
+
 interface FakePermanent {
 	memorybox: 'missing' | 'empty' | 'unclaimed' | 'unreadable' | 'claimed';
 	failingPath: string | undefined;
 	memories: string[];
 	memoryboxListingsBeforeFailure: number;
+	tokenExpired: boolean;
 }
 
 export const fakePermanent: FakePermanent = {
@@ -87,6 +101,7 @@ export const fakePermanent: FakePermanent = {
 	failingPath: undefined,
 	memories: [],
 	memoryboxListingsBeforeFailure: Infinity,
+	tokenExpired: false,
 };
 
 export const resetFakePermanent = (): void => {
@@ -94,6 +109,10 @@ export const resetFakePermanent = (): void => {
 	fakePermanent.failingPath = undefined;
 	fakePermanent.memories = [];
 	fakePermanent.memoryboxListingsBeforeFailure = Infinity;
+	fakePermanent.tokenExpired = false;
+	fakeSecureStore.items = new Map();
+	fakeSecureStore.failure = undefined;
+	fakeSecureStore.writesFinish = Promise.resolve();
 	fakeFiles.sizeBytes = 2048;
 	fakeFiles.missingUris = [];
 	fakeFiles.unreadableUris = [];
@@ -236,6 +255,9 @@ const answer = (url: string, body: unknown): Response | undefined => {
 	return undefined;
 };
 
+const carriesToken = (init: RequestInit | undefined): boolean =>
+	new Headers(init?.headers).has('Authorization');
+
 const urlOf = (input: RequestInfo | URL): string => {
 	if (typeof input === 'string') {
 		return input;
@@ -251,6 +273,11 @@ export const fakePermanentFetch = async (
 	const { failingPath } = fakePermanent;
 	if (failingPath !== undefined && url.includes(failingPath)) {
 		return await Promise.resolve(httpError(500));
+	}
+	if (fakePermanent.tokenExpired && carriesToken(init)) {
+		return await Promise.resolve(
+			httpError(HTTP_STATUS.CLIENT_ERROR.UNAUTHORIZED),
+		);
 	}
 	const response = answer(url, init?.body);
 	return response === undefined

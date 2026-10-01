@@ -37,6 +37,16 @@ describe('rememberReducer', () => {
 		).toEqual({ step: 'check-failed', detail: 'HTTP 500' });
 	});
 
+	it('signs out when the session expires while checking', () => {
+		expect(
+			rememberReducer(INITIAL_STATE, {
+				type: 'checked',
+				result: { outcome: 'signed-out' },
+				today: '2026-09-30',
+			}),
+		).toEqual({ step: 'signed-out' });
+	});
+
 	it('checks again when asked', () => {
 		expect(
 			rememberReducer({ step: 'already-remembered' }, { type: 'check-again' }),
@@ -82,6 +92,15 @@ describe('rememberReducer', () => {
 				result: { outcome: 'failed', detail: 'HTTP 500' },
 			}),
 		).toEqual({ step: 'save-failed', detail: 'HTTP 500' });
+	});
+
+	it('signs out when the session expires while saving', () => {
+		expect(
+			rememberReducer(choosing, {
+				type: 'saved',
+				result: { outcome: 'signed-out' },
+			}),
+		).toEqual({ step: 'signed-out' });
 	});
 
 	it('starts over without checking again', () => {

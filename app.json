@@ -20,7 +20,8 @@
 					"savePhotosPermission": false,
 					"granularPermissions": ["photo"]
 				}
-			]
+			],
+			"expo-secure-store"
 		]
 	}
 }

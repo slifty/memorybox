@@ -66,9 +66,11 @@
 		"unrs-resolver": true
 	},
 	"dependencies": {
+		"@pdc/http-status-codes": "^1.0.1",
 		"expo": "~57.0.26",
 		"expo-file-system": "~57.0.7",
 		"expo-media-library": "~57.0.5",
+		"expo-secure-store": "~57.0.4",
 		"expo-status-bar": "~57.0.1",
 		"react": "19.2.3",
 		"react-native": "0.86.3"

@@ -1,5 +1,10 @@
-import { useReducer, useRef } from 'react';
+import { useCallback, useEffect, useReducer, useRef } from 'react';
 import { signIn, verifyCode } from '../../permanent/auth';
+import {
+	forgetSession,
+	loadSession,
+	saveSession,
+} from '../../permanent/session';
 import type {
 	FailureReason,
 	Session,
@@ -9,16 +14,20 @@ import type {
 export type CodeError = 'invalid-code' | 'expired-code';
 
 export type SignInState =
+	| { step: 'restoring' }
 	| { step: 'credentials' }
 	| { step: 'code'; email: string; error?: CodeError }
 	| { step: 'signed-in'; session: Session }
 	| { step: 'failed'; reason: FailureReason; detail?: string };
 
 export type SignInAction =
+	| { type: 'restored'; session: Session | undefined }
 	| { type: 'result'; email: string; result: SignInResult }
 	| { type: 'start-over' };
 
-export const INITIAL_STATE: SignInState = { step: 'credentials' };
+export const INITIAL_STATE: SignInState = { step: 'restoring' };
+
+const CREDENTIALS: SignInState = { step: 'credentials' };
 
 const isCodeError = (reason: FailureReason): reason is CodeError =>
 	reason === 'invalid-code' || reason === 'expired-code';
@@ -33,14 +42,21 @@ const afterFailure = (
 		? { step: 'code', email: state.email, error: result.reason }
 		: { step: 'failed', reason: result.reason, detail: result.detail };
 
-export const signInReducer = (
+const afterRestoring = (
 	state: SignInState,
-	action: SignInAction,
+	session: Session | undefined,
 ): SignInState => {
-	if (action.type === 'start-over') {
-		return INITIAL_STATE;
+	if (state.step !== 'restoring') {
+		return state;
 	}
-	const { email, result } = action;
+	return session === undefined ? CREDENTIALS : { step: 'signed-in', session };
+};
+
+const afterResult = (
+	state: SignInState,
+	email: string,
+	result: SignInResult,
+): SignInState => {
 	switch (result.outcome) {
 		case 'signed-in':
 			return { step: 'signed-in', session: result.session };
@@ -51,20 +67,45 @@ export const signInReducer = (
 	}
 };
 
+export const signInReducer = (
+	state: SignInState,
+	action: SignInAction,
+): SignInState => {
+	switch (action.type) {
+		case 'restored':
+			return afterRestoring(state, action.session);
+		case 'result':
+			return afterResult(state, action.email, action.result);
+		case 'start-over':
+			return CREDENTIALS;
+	}
+};
+
 interface SignInFlow {
 	state: SignInState;
 	submitCredentials: (email: string, password: string) => Promise<void>;
 	submitCode: (code: string) => Promise<void>;
 	startOver: () => void;
+	signOut: () => void;
 }
 
-// The session lives in memory only, so it ends when the app does.
-// Remembering it between launches is issue #8.
 export const useSignInFlow = (): SignInFlow => {
 	const [state, dispatch] = useReducer(signInReducer, INITIAL_STATE);
 	// Counts attempts, so that a request the user has abandoned by starting
 	// over cannot move the flow when its answer finally arrives.
 	const attemptRef = useRef(0);
+
+	useEffect(() => {
+		let abandoned = false;
+		void loadSession().then((session) => {
+			if (!abandoned) {
+				dispatch({ type: 'restored', session });
+			}
+		});
+		return (): void => {
+			abandoned = true;
+		};
+	}, []);
 
 	const run = async (
 		email: string,
@@ -72,10 +113,19 @@ export const useSignInFlow = (): SignInFlow => {
 	): Promise<void> => {
 		attemptRef.current += 1;
 		const { current: thisAttempt } = attemptRef;
+		const isAbandoned = (): boolean => thisAttempt !== attemptRef.current;
 		const result = await request();
-		if (thisAttempt === attemptRef.current) {
-			dispatch({ type: 'result', email, result });
+		if (isAbandoned()) {
+			return;
 		}
+		if (result.outcome === 'signed-in') {
+			await saveSession(result.session);
+			if (isAbandoned()) {
+				await forgetSession();
+				return;
+			}
+		}
+		dispatch({ type: 'result', email, result });
 	};
 
 	const submitCredentials = async (
@@ -97,5 +147,12 @@ export const useSignInFlow = (): SignInFlow => {
 		dispatch({ type: 'start-over' });
 	};
 
-	return { state, submitCredentials, submitCode, startOver };
+	const signOut = useCallback((): void => {
+		attemptRef.current += 1;
+		void forgetSession().then(() => {
+			dispatch({ type: 'start-over' });
+		});
+	}, []);
+
+	return { state, submitCredentials, submitCode, startOver, signOut };
 };

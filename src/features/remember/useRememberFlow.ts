@@ -24,7 +24,8 @@ export type RememberState =
 	| { step: 'denied' }
 	| { step: 'failed'; detail: string }
 	| { step: 'save-failed'; detail: string }
-	| { step: 'remembered' };
+	| { step: 'remembered' }
+	| { step: 'signed-out' };
 
 export type RememberAction =
 	| { type: 'checked'; result: RememberedDaysResult; today: string }
@@ -39,12 +40,16 @@ const afterCheck = (
 	result: RememberedDaysResult,
 	today: string,
 ): RememberState => {
-	if (result.outcome === 'failed') {
-		return { step: 'check-failed', detail: result.detail };
+	switch (result.outcome) {
+		case 'failed':
+			return { step: 'check-failed', detail: result.detail };
+		case 'signed-out':
+			return { step: 'signed-out' };
+		case 'found':
+			return result.days.includes(today)
+				? { step: 'already-remembered' }
+				: { step: 'start' };
 	}
-	return result.days.includes(today)
-		? { step: 'already-remembered' }
-		: { step: 'start' };
 };
 
 const afterPhotos = (result: PhotosResult): RememberState => {
@@ -60,10 +65,16 @@ const afterPhotos = (result: PhotosResult): RememberState => {
 	}
 };
 
-const afterSave = (result: SaveMemoryResult): RememberState =>
-	result.outcome === 'saved'
-		? { step: 'remembered' }
-		: { step: 'save-failed', detail: result.detail };
+const afterSave = (result: SaveMemoryResult): RememberState => {
+	switch (result.outcome) {
+		case 'saved':
+			return { step: 'remembered' };
+		case 'failed':
+			return { step: 'save-failed', detail: result.detail };
+		case 'signed-out':
+			return { step: 'signed-out' };
+	}
+};
 
 export const rememberReducer = (
 	_state: RememberState,
@@ -94,11 +105,19 @@ interface RememberFlow {
 export const useRememberFlow = (
 	session: Session,
 	memorybox: Folder,
+	onSignedOut: () => void,
 ): RememberFlow => {
 	const [state, dispatch] = useReducer(rememberReducer, INITIAL_STATE);
 	const attemptRef = useRef(0);
 	const checking = state.step === 'checking';
 	const alreadyRemembered = state.step === 'already-remembered';
+	const signedOut = state.step === 'signed-out';
+
+	useEffect(() => {
+		if (signedOut) {
+			onSignedOut();
+		}
+	}, [signedOut, onSignedOut]);
 
 	useEffect(() => {
 		if (!alreadyRemembered) {
