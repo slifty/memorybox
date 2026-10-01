@@ -4,6 +4,6 @@ import type { ReactElement } from 'react';
 
 export const PreparingScreen = (): ReactElement => (
 	<Screen>
-		<BodyText>Getting your Memorybox folder ready…</BodyText>
+		<BodyText>Setting up your Memorybox…</BodyText>
 	</Screen>
 );
