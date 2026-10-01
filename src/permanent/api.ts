@@ -48,7 +48,7 @@ const read = (body: unknown): Reply => {
 		: { ok: false, code: undefined, detail: 'Success without data' };
 };
 
-const describe = (error: unknown): string =>
+export const describe = (error: unknown): string =>
 	error instanceof Error ? error.message : 'Unknown error';
 
 export const post = async (path: string, payload: Values): Promise<Reply> => {
@@ -136,18 +136,3 @@ export const postVersionTwo = async (
 		headers: versionTwoHeaders(token),
 		body: JSON.stringify(body),
 	});
-
-export const postForm = async (url: string, form: FormData): Promise<Done> => {
-	try {
-		const response = await fetch(url, {
-			method: 'POST',
-			credentials: 'omit',
-			body: form,
-		});
-		return response.ok
-			? { ok: true }
-			: { ok: false, detail: `HTTP ${String(response.status)}` };
-	} catch (error) {
-		return { ok: false, detail: describe(error) };
-	}
-};

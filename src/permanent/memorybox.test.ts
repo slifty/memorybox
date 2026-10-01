@@ -11,7 +11,9 @@ import { prepareMemorybox } from './memorybox';
 import {
 	DESTINATION_URL,
 	MEMORYBOX,
+	UPLOAD_FIELDS,
 	UPLOAD_URL,
+	fakeFiles,
 	fakePermanent,
 	fakePermanentFetch,
 	resetFakePermanent,
@@ -135,12 +137,34 @@ describe('prepareMemorybox', () => {
 			});
 		});
 
-		it('uploads the marker without cookies', async () => {
+		it('uploads the marker to the storage URL it was given', async () => {
 			await prepareMemorybox(session);
 
-			expect(requestTo(UPLOAD_URL)).toMatchObject({
-				method: 'POST',
-				credentials: 'omit',
+			expect(fakeFiles.uploads).toEqual([
+				{
+					uri: 'file:///cache/.memorybox',
+					url: UPLOAD_URL,
+					options: expect.objectContaining({
+						fieldName: 'file',
+						parameters: {
+							...UPLOAD_FIELDS,
+							'Content-Type': 'application/json',
+						},
+					}),
+				},
+			]);
+			expect(fakeFiles.written.get('file:///cache/.memorybox')).toBe(
+				'{"createdBy":"memorybox"}',
+			);
+		});
+
+		it('explains a failed upload to storage', async () => {
+			fakeFiles.uploadStatus = 403;
+
+			expect(await prepareMemorybox(session)).toEqual({
+				outcome: 'failed',
+				reason: 'unexpected',
+				detail: 'HTTP 403',
 			});
 		});
 
@@ -164,7 +188,6 @@ describe('prepareMemorybox', () => {
 		it.each([
 			'/folder/post',
 			'/record/getPresignedUrl',
-			UPLOAD_URL,
 			'/record/registerRecord',
 		])('explains a failure at %s', async (failingPath) => {
 			fakePermanent.failingPath = failingPath;
