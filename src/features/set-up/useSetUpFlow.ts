@@ -10,7 +10,8 @@ import type {
 export type SetUpState =
 	| { step: 'preparing' }
 	| { step: 'ready'; memorybox: Folder }
-	| { step: 'failed'; reason: PrepareFailureReason; detail?: string };
+	| { step: 'failed'; reason: PrepareFailureReason; detail?: string }
+	| { step: 'signed-out' };
 
 export type SetUpAction =
 	{ type: 'prepared'; result: PrepareResult } | { type: 'try-again' };
@@ -25,9 +26,14 @@ export const setUpReducer = (
 		return INITIAL_STATE;
 	}
 	const { result } = action;
-	return result.outcome === 'ready'
-		? { step: 'ready', memorybox: result.memorybox }
-		: { step: 'failed', reason: result.reason, detail: result.detail };
+	switch (result.outcome) {
+		case 'ready':
+			return { step: 'ready', memorybox: result.memorybox };
+		case 'failed':
+			return { step: 'failed', reason: result.reason, detail: result.detail };
+		case 'signed-out':
+			return { step: 'signed-out' };
+	}
 };
 
 interface SetUpFlow {
@@ -35,9 +41,19 @@ interface SetUpFlow {
 	tryAgain: () => void;
 }
 
-export const useSetUpFlow = (session: Session): SetUpFlow => {
+export const useSetUpFlow = (
+	session: Session,
+	onSignedOut: () => void,
+): SetUpFlow => {
 	const [state, dispatch] = useReducer(setUpReducer, INITIAL_STATE);
 	const preparing = state.step === 'preparing';
+	const signedOut = state.step === 'signed-out';
+
+	useEffect(() => {
+		if (signedOut) {
+			onSignedOut();
+		}
+	}, [signedOut, onSignedOut]);
 
 	useEffect(() => {
 		if (!preparing) {

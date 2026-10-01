@@ -7,17 +7,20 @@ import type { ReactElement } from 'react';
 
 interface SetUpFlowProps {
 	session: Session;
+	onSignedOut: () => void;
 	renderReady: (memorybox: Folder) => ReactElement;
 }
 
 export const SetUpFlow = ({
 	session,
+	onSignedOut,
 	renderReady,
 }: SetUpFlowProps): ReactElement => {
-	const { state, tryAgain } = useSetUpFlow(session);
+	const { state, tryAgain } = useSetUpFlow(session, onSignedOut);
 
 	switch (state.step) {
 		case 'preparing':
+		case 'signed-out':
 			return <PreparingScreen />;
 		case 'ready':
 			return renderReady(state.memorybox);

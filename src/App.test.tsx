@@ -17,11 +17,13 @@ import { AppState } from 'react-native';
 import { App } from './App';
 import { permanentApiUrl } from './config';
 import { dayOf } from './permanent/memories';
+import { saveSession } from './permanent/session';
 import {
 	failure,
 	fakeFiles,
 	fakePermanent,
 	fakePermanentFetch,
+	fakeSecureStore,
 	loginSuccess,
 	resetFakePermanent,
 	verifySuccess,
@@ -105,6 +107,50 @@ describe('App', () => {
 		await logIn();
 
 		expect(await findRemember()).toBeOnTheScreen();
+	});
+
+	it('remembers the login between launches', async () => {
+		fetchMock.mockResolvedValueOnce(loginSuccess());
+		await logIn();
+		expect(await findRemember()).toBeOnTheScreen();
+
+		await screen.unmount();
+		fetchMock.mockClear();
+		await render(<App />);
+
+		expect(await findRemember()).toBeOnTheScreen();
+		expect(
+			fetchMock.mock.calls.filter(
+				([url]) => url === `${permanentApiUrl}/auth/login`,
+			),
+		).toHaveLength(0);
+	});
+
+	it('asks to log in again when the remembered login has expired', async () => {
+		await saveSession({
+			token: 'expired-token',
+			account: { email: 'ada@example.com', name: 'Ada' },
+		});
+		fakePermanent.tokenExpired = true;
+		await render(<App />);
+
+		expect(await screen.findByText('Log in to Permanent')).toBeOnTheScreen();
+		expect(fakeSecureStore.items.size).toBe(0);
+	});
+
+	it('asks to log in again when the login expires mid-memory', async () => {
+		fakeLibrary.photos = [photoTakenAt(today(9, 15))];
+		const user = await remember();
+		await user.press(
+			await screen.findByRole('button', { name: /Photo taken at 9:15/v }),
+		);
+
+		fakePermanent.tokenExpired = true;
+		await user.press(screen.getByRole('button', { name: 'Capture Memory' }));
+
+		expect(await screen.findByText('Log in to Permanent')).toBeOnTheScreen();
+		expect(fakeSecureStore.items.size).toBe(0);
+		expect(fakeFiles.uploads).toHaveLength(0);
 	});
 
 	it('creates the Memorybox folder on first use', async () => {
@@ -332,6 +378,32 @@ describe('App', () => {
 		expect(
 			screen.queryByRole('button', { name: 'Remember' }),
 		).not.toBeOnTheScreen();
+	});
+
+	it('ignores a verification that finishes saving after starting over', async () => {
+		let finishWrites = (): void => undefined;
+		fakeSecureStore.writesFinish = new Promise((settle) => {
+			finishWrites = settle;
+		});
+		fetchMock
+			.mockResolvedValueOnce(failure('warning.auth.mfaToken'))
+			.mockResolvedValueOnce(verifySuccess());
+		const user = await logIn();
+
+		await enterCode(user, '1234');
+		await user.press(screen.getByRole('button', { name: 'Start over' }));
+		await act(async () => {
+			finishWrites();
+			await new Promise((settle) => {
+				setTimeout(settle, 0);
+			});
+		});
+
+		expect(screen.getByText('Log in to Permanent')).toBeOnTheScreen();
+		expect(
+			screen.queryByRole('button', { name: 'Remember' }),
+		).not.toBeOnTheScreen();
+		expect(fakeSecureStore.items.size).toBe(0);
 	});
 
 	it('remembers a photo taken today', async () => {

@@ -7,10 +7,15 @@ import type { ReactElement } from 'react';
 export const App = (): ReactElement => (
 	<>
 		<SignInFlow
-			renderSignedIn={(session) => (
+			renderSignedIn={(session, signOut) => (
 				<SetUpFlow
+					onSignedOut={signOut}
 					renderReady={(memorybox) => (
-						<RememberFlow memorybox={memorybox} session={session} />
+						<RememberFlow
+							memorybox={memorybox}
+							onSignedOut={signOut}
+							session={session}
+						/>
 					)}
 					session={session}
 				/>

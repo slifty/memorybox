@@ -23,6 +23,15 @@ describe('setUpReducer', () => {
 		).toEqual({ step: 'failed', reason: 'unexpected', detail: 'HTTP 500' });
 	});
 
+	it('signs out when the session has expired', () => {
+		expect(
+			setUpReducer(INITIAL_STATE, {
+				type: 'prepared',
+				result: { outcome: 'signed-out' },
+			}),
+		).toEqual({ step: 'signed-out' });
+	});
+
 	it('prepares again after a failure', () => {
 		const failed: SetUpState = { step: 'failed', reason: 'unclaimed-folder' };
 

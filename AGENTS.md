@@ -24,8 +24,9 @@ archive's My Files. It then checks that folder for a memory named for today.
 If there is none, it lets them pick one of the photos they took today and
 capture it as a memory, which uploads the photo to that folder as
 `yyyy-mm-dd.<format>`, named for the day it was taken. The app
-keeps the access token in memory only, so a restart means logging in again (#8
-tracks remembering it). There is no deployment workflow yet.
+keeps the session in the platform's secure storage, so a returning user skips
+the login screen until the token expires. There is no way to log out yet (#21).
+There is no deployment workflow yet.
 
 ### Permanent
 
@@ -61,6 +62,13 @@ folder named `Memorybox` in My Files. A folder the app creates gets a
 and the app finishes it. Any other `Memorybox` folder without the file belongs
 to someone else, so the app stops rather than writing into it.
 
+**The session.** `src/permanent/session.ts` keeps the access token and account
+in secure storage through `expo-secure-store`: the iOS Keychain or Android
+Keystore, never AsyncStorage, because the token is a bearer credential.
+Permanent issues no refresh token. When a token stops working, its calls
+answer HTTP 401, which the client reports as `signed-out`. The app then forgets
+the stored session and returns to the login screen.
+
 Details of the API that are easy to trip over:
 
 - **Sign-in failures come back as HTTP 200.** `isSuccessful` is false and
@@ -69,7 +77,7 @@ Details of the API that are easy to trip over:
   `warning.auth.mfaToken` when the account needs a code. `/auth/verify` then
   has to carry the session cookie from that login call, so requests set
   `credentials: 'include'`. That cookie lives in the platform's native cookie
-  store, not in app state. Nothing clears it yet; logging out (#8) should.
+  store, not in app state. Nothing clears it yet; logging out (#21) should.
 
 [permanent-ios](https://github.com/PermanentOrg/permanent-ios) is the reference
 for sign-in. For the rest of the API, the references are Permanent's
@@ -180,6 +188,7 @@ src/
 │   ├── memorybox.ts                   # Finding or creating the Memorybox folder
 │   ├── memories.ts                    # Saving memories
 │   ├── records.ts                     # Uploading files
+│   ├── session.ts                     # Keeping the session on the device
 │   └── testing.ts                     # Response builders, and a fake server
 ├── photos/                            # The device's photo library
 │   ├── library.ts                     # Finding today's photos
@@ -263,7 +272,8 @@ The rules that follow from this:
    automatically because `roots` is `src`. The `expo-media-library` mock reads
    from the fake library in `src/photos/testing.ts`, and the `expo-file-system`
    mock from `fakeFiles` in `src/permanent/testing.ts`, which also records
-   uploads. Tests arrange those fakes and reset them in `beforeEach`.
+   uploads. The `expo-secure-store` mock reads from `fakeSecureStore` there.
+   Tests arrange those fakes and reset them in `beforeEach`.
 
 ## Linting
 

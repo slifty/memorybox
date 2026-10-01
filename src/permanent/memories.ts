@@ -1,5 +1,6 @@
 import { listChildren } from './folders';
 import { uploadDeviceFile } from './records';
+import type { Failure } from './api';
 import type { Session } from './auth';
 import type { Child, Folder } from './folders';
 
@@ -8,8 +9,14 @@ export interface Memory {
 	takenAtMs: number;
 }
 
-export type SaveMemoryResult =
-	{ outcome: 'saved' } | { outcome: 'failed'; detail: string };
+type Failed = { outcome: 'failed'; detail: string } | { outcome: 'signed-out' };
+
+const failed = ({ detail, signedOut }: Failure): Failed =>
+	signedOut === true
+		? { outcome: 'signed-out' }
+		: { outcome: 'failed', detail };
+
+export type SaveMemoryResult = { outcome: 'saved' } | Failed;
 
 const TYPES_BY_EXTENSION = new Map([
 	['jpg', 'image/jpeg'],
@@ -58,13 +65,11 @@ export const saveMemory = async (
 		name: `${dayOf(takenAtMs)}.${extension}`,
 		type: TYPES_BY_EXTENSION.get(extension) ?? UNKNOWN_TYPE,
 	});
-	return uploaded.ok
-		? { outcome: 'saved' }
-		: { outcome: 'failed', detail: uploaded.detail };
+	return uploaded.ok ? { outcome: 'saved' } : failed(uploaded);
 };
 
 export type RememberedDaysResult =
-	{ outcome: 'found'; days: string[] } | { outcome: 'failed'; detail: string };
+	{ outcome: 'found'; days: string[] } | Failed;
 
 const DAY_PART_LENGTHS = [4, 2, 2];
 
@@ -103,7 +108,7 @@ export const findRememberedDays = async (
 ): Promise<RememberedDaysResult> => {
 	const children = await listChildren(session, memorybox);
 	if (!children.ok) {
-		return { outcome: 'failed', detail: children.detail };
+		return failed(children);
 	}
 	if (children.value.some(isUnreadable)) {
 		return { outcome: 'failed', detail: 'Unreadable memory in Memorybox' };

@@ -101,6 +101,17 @@ describe('saveMemory', () => {
 			}),
 		).toEqual({ outcome: 'failed', detail: 'HTTP 500' });
 	});
+
+	it('reports an expired token as signed out', async () => {
+		fakePermanent.tokenExpired = true;
+
+		expect(
+			await saveMemory(session, MEMORYBOX, {
+				photoUri: 'file:///photos/IMG_0001.jpg',
+				takenAtMs: lateEvening,
+			}),
+		).toEqual({ outcome: 'signed-out' });
+	});
 });
 
 const json = (body: unknown): Response =>
@@ -258,6 +269,14 @@ describe('findRememberedDays', () => {
 		expect(await findRememberedDays(session, MEMORYBOX)).toEqual({
 			outcome: 'failed',
 			detail: 'HTTP 500',
+		});
+	});
+
+	it('reports an expired token as signed out', async () => {
+		fakePermanent.tokenExpired = true;
+
+		expect(await findRememberedDays(session, MEMORYBOX)).toEqual({
+			outcome: 'signed-out',
 		});
 	});
 });

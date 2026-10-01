@@ -12,19 +12,23 @@ import type { ReactElement } from 'react';
 interface RememberFlowProps {
 	session: Session;
 	memorybox: Folder;
+	onSignedOut: () => void;
 }
 
 export const RememberFlow = ({
 	session,
 	memorybox,
+	onSignedOut,
 }: RememberFlowProps): ReactElement => {
 	const { state, findPhotos, capture, startOver, checkAgain } = useRememberFlow(
 		session,
 		memorybox,
+		onSignedOut,
 	);
 
 	switch (state.step) {
 		case 'checking':
+		case 'signed-out':
 			return <CheckingScreen />;
 		case 'check-failed':
 			return (

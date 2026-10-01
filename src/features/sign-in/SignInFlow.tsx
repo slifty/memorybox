@@ -1,3 +1,4 @@
+import { Screen } from '../../components/Screen';
 import { CodeScreen } from './CodeScreen';
 import { CredentialsScreen } from './CredentialsScreen';
 import { FailureScreen } from './FailureScreen';
@@ -6,15 +7,18 @@ import type { Session } from '../../permanent/auth';
 import type { ReactElement } from 'react';
 
 interface SignInFlowProps {
-	renderSignedIn: (session: Session) => ReactElement;
+	renderSignedIn: (session: Session, signOut: () => void) => ReactElement;
 }
 
 export const SignInFlow = ({
 	renderSignedIn,
 }: SignInFlowProps): ReactElement => {
-	const { state, submitCredentials, submitCode, startOver } = useSignInFlow();
+	const { state, submitCredentials, submitCode, startOver, signOut } =
+		useSignInFlow();
 
 	switch (state.step) {
+		case 'restoring':
+			return <Screen />;
 		case 'credentials':
 			return <CredentialsScreen onSubmit={submitCredentials} />;
 		case 'code':
@@ -27,7 +31,7 @@ export const SignInFlow = ({
 				/>
 			);
 		case 'signed-in':
-			return renderSignedIn(state.session);
+			return renderSignedIn(state.session, signOut);
 		case 'failed':
 			return (
 				<FailureScreen

@@ -1,5 +1,6 @@
 import { createFolder, findMyFiles, listChildren } from './folders';
 import { uploadTextFile } from './records';
+import type { Failure } from './api';
 import type { Session } from './auth';
 import type { Child, Folder } from './folders';
 
@@ -11,13 +12,13 @@ export type PrepareFailureReason = 'unclaimed-folder' | 'unexpected';
 
 export type PrepareResult =
 	| { outcome: 'ready'; memorybox: Folder }
-	| { outcome: 'failed'; reason: PrepareFailureReason; detail?: string };
+	| { outcome: 'failed'; reason: PrepareFailureReason; detail?: string }
+	| { outcome: 'signed-out' };
 
-const unexpected = (detail: string): PrepareResult => ({
-	outcome: 'failed',
-	reason: 'unexpected',
-	detail,
-});
+const unexpected = ({ detail, signedOut }: Failure): PrepareResult =>
+	signedOut === true
+		? { outcome: 'signed-out' }
+		: { outcome: 'failed', reason: 'unexpected', detail };
 
 const isMarker = (child: Child): boolean =>
 	child.kind === 'record' &&
@@ -32,9 +33,7 @@ const claim = async (
 		type: 'application/json',
 		contents: JSON.stringify({ createdBy: 'memorybox' }),
 	});
-	return marked.ok
-		? { outcome: 'ready', memorybox }
-		: unexpected(marked.detail);
+	return marked.ok ? { outcome: 'ready', memorybox } : unexpected(marked);
 };
 
 const adoptExisting = async (
@@ -43,7 +42,7 @@ const adoptExisting = async (
 ): Promise<PrepareResult> => {
 	const children = await listChildren(session, memorybox);
 	if (!children.ok) {
-		return unexpected(children.detail);
+		return unexpected(children);
 	}
 	if (children.value.some(isMarker)) {
 		return { outcome: 'ready', memorybox };
@@ -58,9 +57,7 @@ const createMemorybox = async (
 	myFiles: Folder,
 ): Promise<PrepareResult> => {
 	const created = await createFolder(session, myFiles, MEMORYBOX_FOLDER_NAME);
-	return created.ok
-		? await claim(session, created.value)
-		: unexpected(created.detail);
+	return created.ok ? await claim(session, created.value) : unexpected(created);
 };
 
 export const prepareMemorybox = async (
@@ -68,11 +65,11 @@ export const prepareMemorybox = async (
 ): Promise<PrepareResult> => {
 	const myFiles = await findMyFiles(session);
 	if (!myFiles.ok) {
-		return unexpected(myFiles.detail);
+		return unexpected(myFiles);
 	}
 	const children = await listChildren(session, myFiles.value);
 	if (!children.ok) {
-		return unexpected(children.detail);
+		return unexpected(children);
 	}
 	const existing = children.value.find(
 		(child) => child.kind === 'folder' && child.name === MEMORYBOX_FOLDER_NAME,

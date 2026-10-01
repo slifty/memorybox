@@ -5,28 +5,47 @@ import type { SignInResult } from '../../permanent/auth';
 
 const email = 'ada@example.com';
 const session = { token: 'auth-token', account: { email, name: 'Ada' } };
+const credentialsStep: SignInState = { step: 'credentials' };
 const codeStep: SignInState = { step: 'code', email };
 
 const after = (state: SignInState, result: SignInResult): SignInState =>
 	signInReducer(state, { type: 'result', email, result });
 
 describe('signInReducer', () => {
+	it('restores a remembered session', () => {
+		expect(signInReducer(INITIAL_STATE, { type: 'restored', session })).toEqual(
+			{ step: 'signed-in', session },
+		);
+	});
+
+	it('asks for credentials when no session is remembered', () => {
+		expect(
+			signInReducer(INITIAL_STATE, { type: 'restored', session: undefined }),
+		).toEqual(credentialsStep);
+	});
+
+	it('ignores a restored session once restoring is over', () => {
+		expect(signInReducer(codeStep, { type: 'restored', session })).toEqual(
+			codeStep,
+		);
+	});
+
 	it('signs in', () => {
-		expect(after(INITIAL_STATE, { outcome: 'signed-in', session })).toEqual({
+		expect(after(credentialsStep, { outcome: 'signed-in', session })).toEqual({
 			step: 'signed-in',
 			session,
 		});
 	});
 
 	it('asks for a code when one is required', () => {
-		expect(after(INITIAL_STATE, { outcome: 'code-required' })).toEqual(
+		expect(after(credentialsStep, { outcome: 'code-required' })).toEqual(
 			codeStep,
 		);
 	});
 
 	it('ends the attempt when the credentials are rejected', () => {
 		expect(
-			after(INITIAL_STATE, {
+			after(credentialsStep, {
 				outcome: 'failed',
 				reason: 'invalid-credentials',
 			}),
@@ -56,7 +75,7 @@ describe('signInReducer', () => {
 
 	it('starts over from any step', () => {
 		expect(signInReducer(codeStep, { type: 'start-over' })).toEqual(
-			INITIAL_STATE,
+			credentialsStep,
 		);
 	});
 });

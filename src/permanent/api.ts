@@ -9,6 +9,7 @@
 
 /* eslint-disable @typescript-eslint/naming-convention --
    Permanent's API names its fields in PascalCase (`RequestVO`, `Results`). */
+import { HTTP_STATUS } from '@pdc/http-status-codes';
 import { permanentApiUrl, permanentStelaUrl } from '../config';
 
 export type Values = Record<string, unknown>;
@@ -77,6 +78,7 @@ export const post = async (path: string, payload: Values): Promise<Reply> => {
 export interface Failure {
 	ok: false;
 	detail: string;
+	signedOut?: true;
 }
 
 export type Attempt<T> = { ok: true; value: T } | Failure;
@@ -100,6 +102,9 @@ const send = async (
 ): Promise<Attempt<Values>> => {
 	try {
 		const response = await fetch(url, init);
+		if (response.status === HTTP_STATUS.CLIENT_ERROR.UNAUTHORIZED.valueOf()) {
+			return { ok: false, detail: 'HTTP 401', signedOut: true };
+		}
 		if (!response.ok) {
 			return { ok: false, detail: `HTTP ${String(response.status)}` };
 		}
