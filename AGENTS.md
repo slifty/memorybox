@@ -288,7 +288,10 @@ The rules that follow from this:
    from the fake library in `src/photos/testing.ts`, and the `expo-file-system`
    mock from `fakeFiles` in `src/permanent/testing.ts`, which also records
    uploads. The `expo-secure-store` mock reads from `fakeSecureStore` there.
-   Tests arrange those fakes and reset them in `beforeEach`.
+   Tests arrange those fakes and reset them in `beforeEach`. The
+   `react-native-safe-area-context` mock re-exports the package's own, whose
+   insets are zero unless a test wraps what it renders in a
+   `SafeAreaProvider` with `initialMetrics`.
 
 ## Linting
 
