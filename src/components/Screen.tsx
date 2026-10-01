@@ -1,5 +1,8 @@
-import { StyleSheet, View } from 'react-native';
+import { useEffect } from 'react';
+import { Animated, StyleSheet } from 'react-native';
 import { theme } from '../theme';
+import { DEFAULT_PALETTE, usePalette } from './Palette';
+import type { PaletteName } from './Palette';
 import type { ReactElement, ReactNode } from 'react';
 
 const styles = StyleSheet.create({
@@ -8,15 +11,31 @@ const styles = StyleSheet.create({
 		justifyContent: 'center',
 		gap: theme.spacing.md,
 		padding: theme.spacing.lg,
-		backgroundColor: theme.colors.background,
 	},
 });
 
 interface ScreenProps {
 	children?: ReactNode;
+	palette?: PaletteName;
 }
 
 // The outermost container of every screen.
-export const Screen = ({ children }: ScreenProps): ReactElement => (
-	<View style={styles.screen}>{children}</View>
-);
+export const Screen = ({
+	children,
+	palette = DEFAULT_PALETTE,
+}: ScreenProps): ReactElement => {
+	const { colors, show } = usePalette();
+
+	useEffect(() => {
+		show(palette);
+	}, [palette, show]);
+
+	return (
+		<Animated.View
+			style={[styles.screen, { backgroundColor: colors.background }]}
+			testID="screen"
+		>
+			{children}
+		</Animated.View>
+	);
+};

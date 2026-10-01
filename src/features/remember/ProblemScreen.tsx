@@ -1,8 +1,8 @@
 import { Linking } from 'react-native';
 import { BodyText } from '../../components/BodyText';
+import { Button } from '../../components/Button';
 import { Heading } from '../../components/Heading';
 import { Screen } from '../../components/Screen';
-import { TextButton } from '../../components/TextButton';
 import type { ReactElement } from 'react';
 
 export type Problem = 'no-photos' | 'denied' | 'failed';
@@ -40,13 +40,13 @@ export const ProblemScreen = ({
 			<BodyText tone="muted">Details: {detail}</BodyText>
 		)}
 		{problem === 'denied' && (
-			<TextButton
+			<Button
 				label="Open Settings"
 				onPress={() => {
 					void Linking.openSettings();
 				}}
 			/>
 		)}
-		<TextButton label="Back" onPress={onBack} />
+		<Button label="Back" onPress={onBack} />
 	</Screen>
 );

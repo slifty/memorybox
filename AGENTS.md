@@ -233,7 +233,13 @@ The rules that follow from this:
 - **Screens contain no styles.** If a screen needs a look that no component
   provides, add or extend a component rather than styling inline.
 - **A component is not tied to one use.** Name and shape it for what it is
-  (`TextButton`), not where it first appeared (`StartOverLink`).
+  (`PhotoGrid`), not where it first appeared (`TodaysPhotosPicker`).
+- **A screen chooses its colors by naming a palette.** `Screen` takes a
+  `palette`, and every component fades to it together through
+  `PaletteProvider`. The palettes are defined in `theme.ts`: yellow until
+  today is remembered, gray after. Components take their colors from
+  `usePalette`, never from `theme.palettes` directly, so that they fade; they
+  still take spacing, radii, and type from the theme.
 - **Keyboard and button submit through `useSubmit`**, so both obey the same
   rules: no empty submits, and no second submit while one is running.
 - **A request the user has abandoned must not move the UI.** Flows count their

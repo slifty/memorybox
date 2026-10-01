@@ -1,23 +1,23 @@
-import { StyleSheet, Text, TextInput, View } from 'react-native';
+import { Animated, StyleSheet, Text, TextInput, View } from 'react-native';
 import { theme } from '../theme';
+import { usePalette } from './Palette';
 import type { ReactElement } from 'react';
 import type { TextInputProps } from 'react-native';
+
+const AnimatedTextInput = Animated.createAnimatedComponent(TextInput);
 
 const styles = StyleSheet.create({
 	field: {
 		gap: theme.spacing.xs,
 	},
 	label: {
-		color: theme.colors.text,
 		fontSize: theme.fontSizes.small,
 		fontWeight: theme.fontWeights.bold,
 	},
 	input: {
 		borderWidth: 1,
-		borderColor: theme.colors.border,
 		borderRadius: theme.radii.md,
 		padding: theme.spacing.md,
-		color: theme.colors.text,
 		fontSize: theme.fontSizes.body,
 	},
 	inputInvalid: {
@@ -49,18 +49,32 @@ export const TextField = ({
 	label,
 	error,
 	...inputProps
-}: TextFieldProps): ReactElement => (
-	<View style={styles.field}>
-		<Text style={styles.label}>{label}</Text>
-		<TextInput
-			{...inputProps}
-			accessibilityLabel={label}
-			style={[styles.input, error !== undefined && styles.inputInvalid]}
-		/>
-		{error !== undefined && (
-			<Text accessibilityLiveRegion="polite" role="alert" style={styles.error}>
-				{error}
-			</Text>
-		)}
-	</View>
-);
+}: TextFieldProps): ReactElement => {
+	const { colors } = usePalette();
+
+	return (
+		<View style={styles.field}>
+			<Animated.Text style={[styles.label, { color: colors.text }]}>
+				{label}
+			</Animated.Text>
+			<AnimatedTextInput
+				{...inputProps}
+				accessibilityLabel={label}
+				style={[
+					styles.input,
+					{ borderColor: colors.accent, color: colors.text },
+					error !== undefined && styles.inputInvalid,
+				]}
+			/>
+			{error !== undefined && (
+				<Text
+					accessibilityLiveRegion="polite"
+					role="alert"
+					style={styles.error}
+				>
+					{error}
+				</Text>
+			)}
+		</View>
+	);
+};

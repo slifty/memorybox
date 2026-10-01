@@ -1,11 +1,12 @@
 import { StatusBar } from 'expo-status-bar';
+import { PaletteProvider } from './components/Palette';
 import { RememberFlow } from './features/remember/RememberFlow';
 import { SetUpFlow } from './features/set-up/SetUpFlow';
 import { SignInFlow } from './features/sign-in/SignInFlow';
 import type { ReactElement } from 'react';
 
 export const App = (): ReactElement => (
-	<>
+	<PaletteProvider>
 		<SignInFlow
 			renderSignedIn={(session, signOut) => (
 				<SetUpFlow
@@ -22,5 +23,5 @@ export const App = (): ReactElement => (
 			)}
 		/>
 		<StatusBar style="auto" />
-	</>
+	</PaletteProvider>
 );

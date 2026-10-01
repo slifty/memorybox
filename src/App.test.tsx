@@ -29,6 +29,8 @@ import {
 	verifySuccess,
 } from './permanent/testing';
 import { fakeLibrary, photoTakenAt, resetFakeLibrary } from './photos/testing';
+import { theme } from './theme';
+import type { PaletteName } from './components/Palette';
 import type { AppStateStatus } from 'react-native';
 
 // End-to-end paths through the app. The pieces have their own tests: the API
@@ -99,6 +101,23 @@ const remember = async (): Promise<ReturnType<typeof userEvent.setup>> => {
 	const user = await logIn();
 	await user.press(await screen.findByRole('button', { name: 'Remember' }));
 	return user;
+};
+
+const expectPaletteAfterFade = async (name: PaletteName): Promise<void> => {
+	await act(async () => {
+		await new Promise((resolve) => {
+			setTimeout(resolve, theme.durations.paletteChange);
+		});
+	});
+	const [red, green, blue] = [1, 3, 5].map((start) =>
+		Number.parseInt(
+			theme.palettes[name].background.slice(start, start + 2),
+			16,
+		),
+	);
+	expect(screen.getByTestId('screen')).toHaveStyle({
+		backgroundColor: `rgba(${red}, ${green}, ${blue}, 1)`,
+	});
 };
 
 describe('App', () => {
@@ -222,6 +241,7 @@ describe('App', () => {
 		await user.press(screen.getByRole('button', { name: 'Back' }));
 
 		expect(await screen.findByText('Today is remembered.')).toBeOnTheScreen();
+		await expectPaletteAfterFade('gray');
 	});
 
 	it('says when today is already remembered', async () => {
@@ -233,6 +253,7 @@ describe('App', () => {
 		expect(
 			screen.queryByRole('button', { name: 'Remember' }),
 		).not.toBeOnTheScreen();
+		await expectPaletteAfterFade('gray');
 	});
 
 	it('checks again when it comes back to the foreground', async () => {
@@ -247,6 +268,7 @@ describe('App', () => {
 		fetchMock.mockResolvedValueOnce(loginSuccess());
 		await logIn();
 		expect(await screen.findByText('Today is remembered.')).toBeOnTheScreen();
+		await expectPaletteAfterFade('gray');
 
 		fakePermanent.memories = [];
 		await act(async () => {
@@ -257,6 +279,7 @@ describe('App', () => {
 		});
 
 		expect(await findRemember()).toBeOnTheScreen();
+		await expectPaletteAfterFade('yellow');
 	});
 
 	it('explains a failed check and checks again on Back', async () => {
@@ -422,6 +445,7 @@ describe('App', () => {
 		expect(fakeFiles.uploads).toMatchObject([
 			{ uri: `file:///${photoTakenAt(today(9, 15)).id}.jpg` },
 		]);
+		await expectPaletteAfterFade('gray');
 	});
 
 	it('explains a memory that could not be saved', async () => {

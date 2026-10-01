@@ -4,7 +4,7 @@ import { Screen } from '../../components/Screen';
 import type { ReactElement } from 'react';
 
 export const RememberedScreen = (): ReactElement => (
-	<Screen>
+	<Screen palette="gray">
 		<FadeSequence
 			steps={[
 				<Heading key="done">Done.</Heading>,

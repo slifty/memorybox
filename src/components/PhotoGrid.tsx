@@ -1,5 +1,6 @@
-import { FlatList, Image, Pressable, StyleSheet } from 'react-native';
+import { Animated, FlatList, Pressable, StyleSheet } from 'react-native';
 import { theme } from '../theme';
+import { usePalette } from './Palette';
 import type { ReactElement } from 'react';
 import type { ImageStyle } from 'react-native';
 
@@ -27,7 +28,6 @@ const photoStyles = StyleSheet.create<Record<'photo' | 'selected', ImageStyle>>(
 		},
 		selected: {
 			borderWidth: theme.spacing.xs,
-			borderColor: theme.colors.primary,
 		},
 	},
 );
@@ -48,30 +48,37 @@ export const PhotoGrid = ({
 	photos,
 	selectedId,
 	onSelect,
-}: PhotoGridProps): ReactElement => (
-	<FlatList
-		data={photos}
-		keyExtractor={({ id }) => id}
-		numColumns={COLUMNS}
-		renderItem={({ item }) => (
-			<Pressable
-				accessibilityLabel={item.accessibilityLabel}
-				accessibilityRole="button"
-				accessibilityState={{ selected: item.id === selectedId }}
-				onPress={() => {
-					onSelect(item.id);
-				}}
-				style={styles.cell}
-			>
-				<Image
-					source={{ uri: item.uri }}
-					style={[
-						photoStyles.photo,
-						item.id === selectedId && photoStyles.selected,
-					]}
-				/>
-			</Pressable>
-		)}
-		style={styles.grid}
-	/>
-);
+}: PhotoGridProps): ReactElement => {
+	const { colors } = usePalette();
+
+	return (
+		<FlatList
+			data={photos}
+			keyExtractor={({ id }) => id}
+			numColumns={COLUMNS}
+			renderItem={({ item }) => (
+				<Pressable
+					accessibilityLabel={item.accessibilityLabel}
+					accessibilityRole="button"
+					accessibilityState={{ selected: item.id === selectedId }}
+					onPress={() => {
+						onSelect(item.id);
+					}}
+					style={styles.cell}
+				>
+					<Animated.Image
+						source={{ uri: item.uri }}
+						style={[
+							photoStyles.photo,
+							item.id === selectedId && [
+								photoStyles.selected,
+								{ borderColor: colors.accent },
+							],
+						]}
+					/>
+				</Pressable>
+			)}
+			style={styles.grid}
+		/>
+	);
+};

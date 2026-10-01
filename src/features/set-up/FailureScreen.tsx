@@ -1,7 +1,7 @@
 import { BodyText } from '../../components/BodyText';
+import { Button } from '../../components/Button';
 import { Heading } from '../../components/Heading';
 import { Screen } from '../../components/Screen';
-import { TextButton } from '../../components/TextButton';
 import type { PrepareFailureReason } from '../../permanent/memorybox';
 import type { ReactElement } from 'react';
 
@@ -28,6 +28,6 @@ export const FailureScreen = ({
 		{detail !== undefined && (
 			<BodyText tone="muted">Details: {detail}</BodyText>
 		)}
-		<TextButton label="Try again" onPress={onTryAgain} />
+		<Button label="Try again" onPress={onTryAgain} />
 	</Screen>
 );

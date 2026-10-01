@@ -1,14 +1,25 @@
 // Design tokens. Components read their colors, spacing, and type from here,
 // so a visual change is a change to this file rather than to every component.
 export const theme = {
+	palettes: {
+		yellow: {
+			background: '#fdf3c4',
+			text: '#7a5200',
+			mutedText: '#8a5a00',
+			accent: '#8a5a00',
+		},
+		gray: {
+			background: '#ececec',
+			text: '#1f1f1f',
+			mutedText: '#525252',
+			accent: '#525252',
+		},
+	},
 	colors: {
-		background: '#ffffff',
-		text: '#1a1a1a',
-		mutedText: '#5c5c5c',
-		border: '#c4c4c4',
-		primary: '#131b4a',
-		onPrimary: '#ffffff',
 		error: '#b3261e',
+	},
+	durations: {
+		paletteChange: 1500,
 	},
 	spacing: {
 		xs: 4,

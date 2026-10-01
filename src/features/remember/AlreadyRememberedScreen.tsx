@@ -4,7 +4,7 @@ import { Screen } from '../../components/Screen';
 import type { ReactElement } from 'react';
 
 export const AlreadyRememberedScreen = (): ReactElement => (
-	<Screen>
+	<Screen palette="gray">
 		<Heading>Today is remembered.</Heading>
 		<BodyText>Remember more tomorrow.</BodyText>
 	</Screen>
