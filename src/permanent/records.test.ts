@@ -6,8 +6,14 @@ import {
 	it,
 	jest,
 } from '@jest/globals';
-import { uploadTextFile } from './records';
-import { DESTINATION_URL, MEMORYBOX, UPLOAD_URL } from './testing';
+import { uploadDeviceFile, uploadTextFile } from './records';
+import {
+	DESTINATION_URL,
+	MEMORYBOX,
+	UPLOAD_URL,
+	fakeFiles,
+	resetFakePermanent,
+} from './testing';
 
 const fetchMock = jest.fn<typeof fetch>();
 
@@ -17,6 +23,7 @@ const session = {
 };
 
 beforeEach(() => {
+	resetFakePermanent();
 	fetchMock.mockReset();
 	fetchMock.mockRejectedValue(new Error('Unstubbed request'));
 	jest.spyOn(globalThis, 'fetch').mockImplementation(fetchMock);
@@ -35,36 +42,91 @@ const uploadTarget = (): Response =>
 		presignedPost: { url: UPLOAD_URL, fields: { key: 'k' } },
 	});
 
-const file = { name: 'notes.txt', type: 'text/plain', contents: 'café' };
-
-const sentSize = (call: number): unknown => {
-	const body = fetchMock.mock.calls[call]?.[1]?.body;
-	const sent: unknown = typeof body === 'string' ? JSON.parse(body) : undefined;
-	return typeof sent === 'object' && sent !== null && 'size' in sent
-		? sent.size
-		: undefined;
+const photo = {
+	uri: 'file:///photos/IMG_0001.jpg',
+	name: '2026-09-30.jpg',
+	type: 'image/jpeg',
 };
 
-describe('uploadTextFile', () => {
-	it('gives the size in bytes, not characters', async () => {
+const sentBody = (call: number): unknown => {
+	const body = fetchMock.mock.calls[call]?.[1]?.body;
+	return typeof body === 'string' ? JSON.parse(body) : undefined;
+};
+
+describe('uploadDeviceFile', () => {
+	it('describes the file by its size on disk', async () => {
+		fakeFiles.sizeBytes = 3_000_000;
 		fetchMock
 			.mockResolvedValueOnce(uploadTarget())
-			.mockResolvedValueOnce(new Response(null, { status: 204 }))
 			.mockResolvedValueOnce(json({ recordId: 30 }));
 
-		expect(await uploadTextFile(session, MEMORYBOX, file)).toEqual({
+		expect(await uploadDeviceFile(session, MEMORYBOX, photo)).toEqual({
 			ok: true,
 		});
-		expect(sentSize(0)).toBe(5);
+		expect(sentBody(0)).toEqual({
+			displayName: '2026-09-30.jpg',
+			parentFolderId: 12,
+			uploadFileName: '2026-09-30.jpg',
+			fileType: 'image/jpeg',
+			size: 3_000_000,
+		});
+		expect(fakeFiles.uploads).toMatchObject([
+			{ uri: photo.uri, url: UPLOAD_URL },
+		]);
+	});
+
+	it('explains a file it cannot read', async () => {
+		fakeFiles.unreadableUris = [photo.uri];
+
+		expect(await uploadDeviceFile(session, MEMORYBOX, photo)).toEqual({
+			ok: false,
+			detail: `Cannot read ${photo.uri}`,
+		});
+	});
+
+	it('refuses an upload target with a field that is not text', async () => {
+		fetchMock.mockResolvedValueOnce(
+			json({
+				destinationUrl: DESTINATION_URL,
+				presignedPost: { url: UPLOAD_URL, fields: { key: 'k', status: 201 } },
+			}),
+		);
+
+		expect(await uploadDeviceFile(session, MEMORYBOX, photo)).toEqual({
+			ok: false,
+			detail: 'Unreadable upload target',
+		});
+		expect(fakeFiles.uploads).toEqual([]);
+	});
+
+	it('explains a storage refusal by its code', async () => {
+		fakeFiles.uploadStatus = 400;
+		fakeFiles.uploadBody =
+			'<?xml version="1.0"?><Error><Code>EntityTooLarge</Code></Error>';
+		fetchMock.mockResolvedValueOnce(uploadTarget());
+
+		expect(await uploadDeviceFile(session, MEMORYBOX, photo)).toEqual({
+			ok: false,
+			detail: 'HTTP 400 EntityTooLarge',
+		});
+	});
+
+	it('explains a file that is not there', async () => {
+		fakeFiles.missingUris = [photo.uri];
+
+		expect(await uploadDeviceFile(session, MEMORYBOX, photo)).toEqual({
+			ok: false,
+			detail: 'File not found',
+		});
+		expect(fetchMock).not.toHaveBeenCalled();
 	});
 
 	it('explains a registration that returned no record', async () => {
 		fetchMock
 			.mockResolvedValueOnce(uploadTarget())
-			.mockResolvedValueOnce(new Response(null, { status: 204 }))
 			.mockResolvedValueOnce(json({}));
 
-		expect(await uploadTextFile(session, MEMORYBOX, file)).toEqual({
+		expect(await uploadDeviceFile(session, MEMORYBOX, photo)).toEqual({
 			ok: false,
 			detail: 'No record registered',
 		});
@@ -73,9 +135,28 @@ describe('uploadTextFile', () => {
 	it('explains an upload target it cannot read', async () => {
 		fetchMock.mockResolvedValueOnce(json({ destinationUrl: DESTINATION_URL }));
 
-		expect(await uploadTextFile(session, MEMORYBOX, file)).toEqual({
+		expect(await uploadDeviceFile(session, MEMORYBOX, photo)).toEqual({
 			ok: false,
-			detail: 'No upload URL',
+			detail: 'Unreadable upload target',
 		});
+	});
+});
+
+describe('uploadTextFile', () => {
+	it('uploads the text from a file in the cache', async () => {
+		fetchMock
+			.mockResolvedValueOnce(uploadTarget())
+			.mockResolvedValueOnce(json({ recordId: 30 }));
+
+		await uploadTextFile(session, MEMORYBOX, {
+			name: 'notes.txt',
+			type: 'text/plain',
+			contents: 'Hello',
+		});
+
+		expect(fakeFiles.written.get('file:///cache/notes.txt')).toBe('Hello');
+		expect(fakeFiles.uploads).toMatchObject([
+			{ uri: 'file:///cache/notes.txt' },
+		]);
 	});
 });

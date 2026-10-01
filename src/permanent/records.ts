@@ -1,5 +1,6 @@
-import { idAt, isValues, postForm, postVersionTwo, stringAt } from './api';
-import type { Attempt, Done } from './api';
+import { File, Paths, UploadType } from 'expo-file-system';
+import { describe, idAt, isValues, postVersionTwo, stringAt } from './api';
+import type { Attempt, Done, Failure } from './api';
 import type { Session } from './auth';
 import type { Folder } from './folders';
 
@@ -7,6 +8,17 @@ export interface TextFile {
 	name: string;
 	type: string;
 	contents: string;
+}
+
+export interface DeviceFile {
+	uri: string;
+	name: string;
+	type: string;
+}
+
+interface Upload extends DeviceFile {
+	source: File;
+	size: number;
 }
 
 interface UploadTarget {
@@ -23,74 +35,96 @@ const toUploadTarget = (value: unknown): UploadTarget | undefined => {
 	if (destinationUrl === undefined || url === undefined || !isValues(fields)) {
 		return undefined;
 	}
-	return {
-		destinationUrl,
-		url,
-		fields: Object.entries(fields).filter(
-			(field): field is [string, string] => typeof field[1] === 'string',
-		),
-	};
+	const entries = Object.entries(fields);
+	const stringEntries = entries.filter(
+		(field): field is [string, string] => typeof field[1] === 'string',
+	);
+	return stringEntries.length === entries.length
+		? { destinationUrl, url, fields: stringEntries }
+		: undefined;
 };
 
-const ESCAPED_BYTE_LENGTH = 3;
-
-const utf8ByteLength = (text: string): number => {
-	const encoded = encodeURIComponent(text);
-	const escapedBytes = encoded.split('%').length - 1;
-	return encoded.length - escapedBytes * (ESCAPED_BYTE_LENGTH - 1);
-};
-
-const describeFile = (
+const describeUpload = (
 	parent: Folder,
-	file: TextFile,
+	upload: Upload,
 ): Record<string, unknown> => ({
-	displayName: file.name,
+	displayName: upload.name,
 	parentFolderId: Number(parent.folderId),
-	uploadFileName: file.name,
-	fileType: file.type,
-	size: utf8ByteLength(file.contents),
+	uploadFileName: upload.name,
+	fileType: upload.type,
+	size: upload.size,
 });
 
 const requestUploadTarget = async (
 	session: Session,
 	parent: Folder,
-	file: TextFile,
+	upload: Upload,
 ): Promise<Attempt<UploadTarget>> => {
 	const reply = await postVersionTwo(
 		session.token,
 		'/record/getPresignedUrl',
-		describeFile(parent, file),
+		describeUpload(parent, upload),
 	);
 	if (!reply.ok) {
 		return reply;
 	}
 	const target = toUploadTarget(reply.value);
 	return target === undefined
-		? { ok: false, detail: 'No upload URL' }
+		? { ok: false, detail: 'Unreadable upload target' }
 		: { ok: true, value: target };
+};
+
+const isSuccessStatus = (status: number): boolean =>
+	status >= 200 && status < 300;
+
+const storageErrorCode = (body: string): string | undefined => {
+	const start = body.indexOf('<Code>');
+	const end = body.indexOf('</Code>');
+	return start === -1 || end <= start
+		? undefined
+		: body.slice(start + '<Code>'.length, end);
+};
+
+const storageFailure = (status: number, body: string): Failure => {
+	const code = storageErrorCode(body);
+	const httpStatus = `HTTP ${String(status)}`;
+	return {
+		ok: false,
+		detail: code === undefined ? httpStatus : `${httpStatus} ${code}`,
+	};
 };
 
 const uploadTo = async (
 	target: UploadTarget,
-	file: TextFile,
+	upload: Upload,
 ): Promise<Done> => {
-	const form = new FormData();
-	target.fields.forEach(([key, value]) => {
-		form.append(key, value);
-	});
-	form.append('Content-Type', file.type);
-	form.append('file', file.contents);
-	return await postForm(target.url, form);
+	try {
+		const { status, body } = await upload.source.upload(target.url, {
+			uploadType: UploadType.MULTIPART,
+			fieldName: 'file',
+			mimeType: upload.type,
+			parameters: {
+				...Object.fromEntries(target.fields),
+				'Content-Type': upload.type,
+			},
+			sessionType: 'foreground',
+		});
+		return isSuccessStatus(status)
+			? { ok: true }
+			: storageFailure(status, body);
+	} catch (error) {
+		return { ok: false, detail: describe(error) };
+	}
 };
 
 const register = async (
 	session: Session,
 	parent: Folder,
-	file: TextFile,
+	upload: Upload,
 	s3url: string,
 ): Promise<Done> => {
 	const reply = await postVersionTwo(session.token, '/record/registerRecord', {
-		...describeFile(parent, file),
+		...describeUpload(parent, upload),
 		s3url,
 		failOnDuplicateName: true,
 	});
@@ -102,18 +136,65 @@ const register = async (
 		: { ok: true };
 };
 
+const toUpload = (file: DeviceFile): Attempt<Upload> => {
+	try {
+		const source = new File(file.uri);
+		const info = source.info();
+		return info.exists && info.size !== undefined
+			? { ok: true, value: { ...file, source, size: info.size } }
+			: { ok: false, detail: 'File not found' };
+	} catch (error) {
+		return { ok: false, detail: describe(error) };
+	}
+};
+
+export const uploadDeviceFile = async (
+	session: Session,
+	parent: Folder,
+	file: DeviceFile,
+): Promise<Done> => {
+	const upload = toUpload(file);
+	if (!upload.ok) {
+		return upload;
+	}
+	const target = await requestUploadTarget(session, parent, upload.value);
+	if (!target.ok) {
+		return target;
+	}
+	const uploaded = await uploadTo(target.value, upload.value);
+	if (!uploaded.ok) {
+		return uploaded;
+	}
+	return await register(
+		session,
+		parent,
+		upload.value,
+		target.value.destinationUrl,
+	);
+};
+
+const writeToCache = (file: TextFile): Attempt<string> => {
+	try {
+		const cached = new File(Paths.cache, file.name);
+		cached.create({ overwrite: true });
+		cached.write(file.contents);
+		return { ok: true, value: cached.uri };
+	} catch (error) {
+		return { ok: false, detail: describe(error) };
+	}
+};
+
 export const uploadTextFile = async (
 	session: Session,
 	parent: Folder,
 	file: TextFile,
 ): Promise<Done> => {
-	const target = await requestUploadTarget(session, parent, file);
-	if (!target.ok) {
-		return target;
-	}
-	const uploaded = await uploadTo(target.value, file);
-	if (!uploaded.ok) {
-		return uploaded;
-	}
-	return await register(session, parent, file, target.value.destinationUrl);
+	const cached = writeToCache(file);
+	return cached.ok
+		? await uploadDeviceFile(session, parent, {
+				uri: cached.value,
+				name: file.name,
+				type: file.type,
+			})
+		: cached;
 };

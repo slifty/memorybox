@@ -21,8 +21,8 @@ For specific dependency versions, consult `package.json`.
 **Status:** the app logs a user in to [Permanent](https://www.permanent.org),
 its backend, and makes sure the Memorybox folder exists in their default
 archive's My Files. It then lets them pick one of the photos they took today and
-capture it as a memory. Capturing does not save anything yet: `saveMemory` in
-`src/permanent/memories.ts` is a placeholder that reports success. The app
+capture it as a memory, which uploads the photo to that folder as
+`yyyy-mm-dd.<format>`, named for the day it was taken. The app
 keeps the access token in memory only, so a restart means logging in again (#8
 tracks remembering it). There is no deployment workflow yet.
 
@@ -49,7 +49,10 @@ The app talks to Permanent in three ways:
   archives and folder contents from it, but it cannot create anything.
 
 Uploading a file takes three calls: `/record/getPresignedUrl` for an S3 form,
-a post of that form to S3, then `/record/registerRecord`.
+a post of that form to S3, then `/record/registerRecord`. The S3 post goes
+through `expo-file-system`, which streams the file from disk natively rather
+than loading it into JavaScript. Text to upload is written to the cache first,
+so every upload takes the same path.
 
 **The Memorybox folder.** After sign-in, `prepareMemorybox` finds or creates a
 folder named `Memorybox` in My Files. A folder the app creates gets a
@@ -174,7 +177,7 @@ src/
 │   ├── auth.ts                        # Signing in
 │   ├── folders.ts                     # Finding, listing, and creating folders
 │   ├── memorybox.ts                   # Finding or creating the Memorybox folder
-│   ├── memories.ts                    # Saving memories (a placeholder)
+│   ├── memories.ts                    # Saving memories
 │   ├── records.ts                     # Uploading files
 │   └── testing.ts                     # Response builders, and a fake server
 ├── photos/                            # The device's photo library
@@ -257,8 +260,9 @@ The rules that follow from this:
 
 5. **Native modules are mocked in `src/__mocks__/`**, which Jest applies
    automatically because `roots` is `src`. The `expo-media-library` mock reads
-   from the fake library in `src/photos/testing.ts`. Tests arrange that fake
-   and reset it in `beforeEach`.
+   from the fake library in `src/photos/testing.ts`, and the `expo-file-system`
+   mock from `fakeFiles` in `src/permanent/testing.ts`, which also records
+   uploads. Tests arrange those fakes and reset them in `beforeEach`.
 
 ## Linting
 

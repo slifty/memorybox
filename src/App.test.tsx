@@ -17,6 +17,7 @@ import { App } from './App';
 import { permanentApiUrl } from './config';
 import {
 	failure,
+	fakeFiles,
 	fakePermanent,
 	fakePermanentFetch,
 	loginSuccess,
@@ -248,6 +249,22 @@ describe('App', () => {
 		await user.press(screen.getByRole('button', { name: 'Capture Memory' }));
 
 		expect(await screen.findByText('Done.')).toBeOnTheScreen();
+		expect(fakeFiles.uploads).toMatchObject([
+			{ uri: `file:///${photoTakenAt(today(9, 15)).id}.jpg` },
+		]);
+	});
+
+	it('explains a memory that could not be saved', async () => {
+		fakeLibrary.photos = [photoTakenAt(today(9, 15))];
+		fakeFiles.uploadStatus = 500;
+		const user = await remember();
+
+		await user.press(
+			await screen.findByRole('button', { name: /Photo taken at 9:15/v }),
+		);
+		await user.press(screen.getByRole('button', { name: 'Capture Memory' }));
+
+		expect(await screen.findByText('Details: HTTP 500')).toBeOnTheScreen();
 	});
 
 	it('captures nothing until a photo is chosen', async () => {

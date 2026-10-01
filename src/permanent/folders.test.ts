@@ -82,6 +82,31 @@ describe('listChildren', () => {
 		});
 	});
 
+	it('stops when the server repeats a page', async () => {
+		fetchMock.mockImplementation(async () => await Promise.resolve(page('1')));
+
+		expect(await listChildren(session, MY_FILES)).toEqual({
+			ok: false,
+			detail: 'Folder contents did not advance',
+		});
+	});
+
+	it('stops when the server cycles back to an earlier page', async () => {
+		fetchMock.mockImplementation(
+			async (url) =>
+				await Promise.resolve(
+					typeof url === 'string' && url.endsWith('cursor=A')
+						? page('B')
+						: page('A'),
+				),
+		);
+
+		expect(await listChildren(session, MY_FILES)).toEqual({
+			ok: false,
+			detail: 'Folder contents did not advance',
+		});
+	});
+
 	it('explains contents it cannot read', async () => {
 		fetchMock.mockResolvedValueOnce(json({ error: 'Nope' }));
 

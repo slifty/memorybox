@@ -39,11 +39,16 @@ const toChild = (item: unknown): Child => {
 		: { kind: 'unreadable' };
 };
 
+interface Listing {
+	cursor: string | undefined;
+	children: Child[];
+	cursorsSeen: ReadonlySet<string>;
+}
+
 const listFrom = async (
 	session: Session,
 	parent: Folder,
-	cursor: string | undefined,
-	earlier: Child[],
+	{ cursor, children: earlier, cursorsSeen }: Listing,
 ): Promise<Attempt<Child[]>> => {
 	const after =
 		cursor === undefined ? '' : `&cursor=${encodeURIComponent(cursor)}`;
@@ -63,15 +68,27 @@ const listFrom = async (
 	const children = [...earlier, ...items.map(toChild)];
 	const nextCursor =
 		items.length === 0 ? undefined : idAt(pagination, 'nextCursor');
-	return nextCursor === undefined
-		? { ok: true, value: children }
-		: await listFrom(session, parent, nextCursor, children);
+	if (nextCursor === undefined) {
+		return { ok: true, value: children };
+	}
+	return cursorsSeen.has(nextCursor)
+		? { ok: false, detail: 'Folder contents did not advance' }
+		: await listFrom(session, parent, {
+				cursor: nextCursor,
+				children,
+				cursorsSeen: new Set([...cursorsSeen, nextCursor]),
+			});
 };
 
 export const listChildren = async (
 	session: Session,
 	parent: Folder,
-): Promise<Attempt<Child[]>> => await listFrom(session, parent, undefined, []);
+): Promise<Attempt<Child[]>> =>
+	await listFrom(session, parent, {
+		cursor: undefined,
+		children: [],
+		cursorsSeen: new Set(),
+	});
 
 const idFrom = async (
 	session: Session,

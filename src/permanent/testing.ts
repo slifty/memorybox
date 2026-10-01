@@ -43,9 +43,37 @@ export const UPLOAD_URL = 'https://uploads.example.com/';
 
 export const DESTINATION_URL = 'https://uploads.example.com/memorybox-marker';
 
+export const UPLOAD_FIELDS = { key: 'marker-key', Policy: 'policy' };
+
 export const MY_FILES = { folderId: '11' };
 
 export const MEMORYBOX = { folderId: '12' };
+
+interface FakeUpload {
+	uri: string;
+	url: string;
+	options: Record<string, unknown>;
+}
+
+interface FakeFiles {
+	sizeBytes: number;
+	missingUris: string[];
+	unreadableUris: string[];
+	written: Map<string, string>;
+	uploads: FakeUpload[];
+	uploadStatus: number;
+	uploadBody: string;
+}
+
+export const fakeFiles: FakeFiles = {
+	sizeBytes: 2048,
+	missingUris: [],
+	unreadableUris: [],
+	written: new Map(),
+	uploads: [],
+	uploadStatus: 204,
+	uploadBody: '',
+};
 
 interface FakePermanent {
 	memorybox: 'missing' | 'empty' | 'unclaimed' | 'unreadable' | 'claimed';
@@ -60,6 +88,13 @@ export const fakePermanent: FakePermanent = {
 export const resetFakePermanent = (): void => {
 	fakePermanent.memorybox = 'claimed';
 	fakePermanent.failingPath = undefined;
+	fakeFiles.sizeBytes = 2048;
+	fakeFiles.missingUris = [];
+	fakeFiles.unreadableUris = [];
+	fakeFiles.written = new Map();
+	fakeFiles.uploads = [];
+	fakeFiles.uploadStatus = 204;
+	fakeFiles.uploadBody = '';
 };
 
 type Item = Record<string, unknown>;
@@ -135,7 +170,7 @@ const answerApi = (path: string): Response | undefined => {
 				destinationUrl: DESTINATION_URL,
 				presignedPost: {
 					url: UPLOAD_URL,
-					fields: { key: 'marker-key', Policy: 'policy' },
+					fields: UPLOAD_FIELDS,
 				},
 			});
 		case '/record/registerRecord':
@@ -153,7 +188,7 @@ const answer = (url: string): Response | undefined => {
 	if (url.startsWith(permanentApiUrl)) {
 		return answerApi(url.slice(permanentApiUrl.length));
 	}
-	return url === UPLOAD_URL ? new Response(null, { status: 204 }) : undefined;
+	return undefined;
 };
 
 const urlOf = (input: RequestInfo | URL): string => {
