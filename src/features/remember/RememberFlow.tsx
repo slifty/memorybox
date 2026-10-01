@@ -1,3 +1,5 @@
+import { AlreadyRememberedScreen } from './AlreadyRememberedScreen';
+import { CheckingScreen } from './CheckingScreen';
 import { PhotosScreen } from './PhotosScreen';
 import { ProblemScreen } from './ProblemScreen';
 import { RememberedScreen } from './RememberedScreen';
@@ -16,12 +18,24 @@ export const RememberFlow = ({
 	session,
 	memorybox,
 }: RememberFlowProps): ReactElement => {
-	const { state, findPhotos, capture, startOver } = useRememberFlow(
+	const { state, findPhotos, capture, startOver, checkAgain } = useRememberFlow(
 		session,
 		memorybox,
 	);
 
 	switch (state.step) {
+		case 'checking':
+			return <CheckingScreen />;
+		case 'check-failed':
+			return (
+				<ProblemScreen
+					detail={state.detail}
+					onBack={checkAgain}
+					problem="failed"
+				/>
+			);
+		case 'already-remembered':
+			return <AlreadyRememberedScreen />;
 		case 'start':
 			return <StartScreen onRemember={findPhotos} />;
 		case 'choosing':
@@ -46,6 +60,14 @@ export const RememberFlow = ({
 				<ProblemScreen
 					detail={state.detail}
 					onBack={startOver}
+					problem="failed"
+				/>
+			);
+		case 'save-failed':
+			return (
+				<ProblemScreen
+					detail={state.detail}
+					onBack={checkAgain}
 					problem="failed"
 				/>
 			);

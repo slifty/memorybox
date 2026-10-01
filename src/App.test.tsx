@@ -13,8 +13,10 @@ import {
 	screen,
 	userEvent,
 } from '@testing-library/react-native';
+import { AppState } from 'react-native';
 import { App } from './App';
 import { permanentApiUrl } from './config';
+import { dayOf } from './permanent/memories';
 import {
 	failure,
 	fakeFiles,
@@ -25,6 +27,7 @@ import {
 	verifySuccess,
 } from './permanent/testing';
 import { fakeLibrary, photoTakenAt, resetFakeLibrary } from './photos/testing';
+import type { AppStateStatus } from 'react-native';
 
 // End-to-end paths through the app. The pieces have their own tests: the API
 // client in permanent/, the flow's rules in features/sign-in/, and the
@@ -74,6 +77,16 @@ const today = (hours: number, minutes: number): Date => {
 	const time = new Date();
 	time.setHours(hours, minutes, 0, 0);
 	return time;
+};
+
+const ONE_DAY_MS = 24 * 60 * 60 * 1000;
+
+const rememberTodayAndTomorrow = (): void => {
+	const now = Date.now();
+	fakePermanent.memories = [
+		`${dayOf(now)}.jpg`,
+		`${dayOf(now + ONE_DAY_MS)}.jpg`,
+	];
 };
 
 const findRemember = async (): Promise<unknown> =>
@@ -134,6 +147,91 @@ describe('App', () => {
 		await logIn();
 
 		expect(await screen.findByText('Details: HTTP 500')).toBeOnTheScreen();
+	});
+
+	it('goes back without checking again when photos cannot be found', async () => {
+		fakeLibrary.failure = new Error('Library unavailable');
+		const user = await remember();
+		expect(
+			await screen.findByText('Details: Library unavailable'),
+		).toBeOnTheScreen();
+
+		fakePermanent.memoryboxListingsBeforeFailure = 0;
+		await user.press(screen.getByRole('button', { name: 'Back' }));
+
+		expect(await findRemember()).toBeOnTheScreen();
+	});
+
+	it('checks again after a failed save, in case it reached Permanent', async () => {
+		fakeLibrary.photos = [photoTakenAt(today(9, 15))];
+		fakeFiles.uploadStatus = 500;
+		const user = await remember();
+		await user.press(
+			await screen.findByRole('button', { name: /Photo taken at 9:15/v }),
+		);
+		await user.press(screen.getByRole('button', { name: 'Capture Memory' }));
+		expect(await screen.findByText('Details: HTTP 500')).toBeOnTheScreen();
+
+		rememberTodayAndTomorrow();
+		await user.press(screen.getByRole('button', { name: 'Back' }));
+
+		expect(await screen.findByText('Today is remembered.')).toBeOnTheScreen();
+	});
+
+	it('says when today is already remembered', async () => {
+		rememberTodayAndTomorrow();
+		fetchMock.mockResolvedValueOnce(loginSuccess());
+		await logIn();
+
+		expect(await screen.findByText('Today is remembered.')).toBeOnTheScreen();
+		expect(
+			screen.queryByRole('button', { name: 'Remember' }),
+		).not.toBeOnTheScreen();
+	});
+
+	it('checks again when it comes back to the foreground', async () => {
+		const listeners: Array<(state: AppStateStatus) => void> = [];
+		jest
+			.spyOn(AppState, 'addEventListener')
+			.mockImplementation((_, listener) => {
+				listeners.push(listener);
+				return { remove: (): void => undefined };
+			});
+		rememberTodayAndTomorrow();
+		fetchMock.mockResolvedValueOnce(loginSuccess());
+		await logIn();
+		expect(await screen.findByText('Today is remembered.')).toBeOnTheScreen();
+
+		fakePermanent.memories = [];
+		await act(async () => {
+			for (const listener of listeners) {
+				listener('active');
+			}
+			await Promise.resolve();
+		});
+
+		expect(await findRemember()).toBeOnTheScreen();
+	});
+
+	it('explains a failed check and checks again on Back', async () => {
+		fakePermanent.memoryboxListingsBeforeFailure = 1;
+		fetchMock.mockResolvedValueOnce(loginSuccess());
+		const user = await logIn();
+
+		expect(await screen.findByText('Details: HTTP 500')).toBeOnTheScreen();
+
+		fakePermanent.memoryboxListingsBeforeFailure = Infinity;
+		await user.press(screen.getByRole('button', { name: 'Back' }));
+
+		expect(await findRemember()).toBeOnTheScreen();
+	});
+
+	it('offers to remember today when only earlier days are', async () => {
+		fakePermanent.memories = ['2020-01-01.jpg'];
+		fetchMock.mockResolvedValueOnce(loginSuccess());
+		await logIn();
+
+		expect(await findRemember()).toBeOnTheScreen();
 	});
 
 	it('explains rejected credentials and offers another try', async () => {

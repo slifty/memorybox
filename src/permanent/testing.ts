@@ -78,16 +78,22 @@ export const fakeFiles: FakeFiles = {
 interface FakePermanent {
 	memorybox: 'missing' | 'empty' | 'unclaimed' | 'unreadable' | 'claimed';
 	failingPath: string | undefined;
+	memories: string[];
+	memoryboxListingsBeforeFailure: number;
 }
 
 export const fakePermanent: FakePermanent = {
 	memorybox: 'claimed',
 	failingPath: undefined,
+	memories: [],
+	memoryboxListingsBeforeFailure: Infinity,
 };
 
 export const resetFakePermanent = (): void => {
 	fakePermanent.memorybox = 'claimed';
 	fakePermanent.failingPath = undefined;
+	fakePermanent.memories = [];
+	fakePermanent.memoryboxListingsBeforeFailure = Infinity;
 	fakeFiles.sizeBytes = 2048;
 	fakeFiles.missingUris = [];
 	fakeFiles.unreadableUris = [];
@@ -112,12 +118,23 @@ const recordItem = (
 	folderLinkId: string,
 ): Item => ({ itemType: 'record', displayName, uploadFileName, folderLinkId });
 
-const memoryboxContents: Record<FakePermanent['memorybox'], Item[]> = {
-	missing: [],
-	empty: [],
-	unclaimed: [recordItem('Notes', 'notes.txt', '123')],
-	unreadable: [{ itemType: 'something-new', folderLinkId: '124' }],
-	claimed: [recordItem('.memorybox', '.memorybox', '122')],
+const memoryItems = (): Item[] =>
+	fakePermanent.memories.map((name, index) =>
+		recordItem(name, name, String(200 + index)),
+	);
+
+const memoryboxContents = (): Item[] => {
+	switch (fakePermanent.memorybox) {
+		case 'missing':
+		case 'empty':
+			return [];
+		case 'unclaimed':
+			return [recordItem('Notes', 'notes.txt', '123')];
+		case 'unreadable':
+			return [{ itemType: 'something-new', folderLinkId: '124' }];
+		case 'claimed':
+			return [recordItem('.memorybox', '.memorybox', '122'), ...memoryItems()];
+	}
 };
 
 const childrenOf = (folderId: string): Item[] => {
@@ -135,14 +152,23 @@ const childrenOf = (folderId: string): Item[] => {
 					: [folderItem('Memorybox', 'private', MEMORYBOX.folderId, '112')]),
 			];
 		case MEMORYBOX.folderId:
-			return memoryboxContents[fakePermanent.memorybox];
+			return memoryboxContents();
 		default:
 			return [];
 	}
 };
 
+const isNewMemoryboxListing = (folderId: string, path: string): boolean =>
+	folderId === MEMORYBOX.folderId && !path.includes('cursor=');
+
 const childrenPage = (path: string): Response => {
 	const [, , folderId = ''] = path.split('/');
+	if (isNewMemoryboxListing(folderId, path)) {
+		if (fakePermanent.memoryboxListingsBeforeFailure <= 0) {
+			return httpError(500);
+		}
+		fakePermanent.memoryboxListingsBeforeFailure -= 1;
+	}
 	const items = path.includes('cursor=') ? [] : childrenOf(folderId);
 	return respond({
 		items,
@@ -160,7 +186,26 @@ const answerStela = (path: string): Response | undefined => {
 	return path.startsWith('/folders/') ? childrenPage(path) : undefined;
 };
 
-const answerApi = (path: string): Response | undefined => {
+const registeredName = (body: unknown): string | undefined => {
+	const sent: unknown = typeof body === 'string' ? JSON.parse(body) : undefined;
+	return typeof sent === 'object' &&
+		sent !== null &&
+		'uploadFileName' in sent &&
+		typeof sent.uploadFileName === 'string'
+		? sent.uploadFileName
+		: undefined;
+};
+
+const register = (body: unknown): void => {
+	const name = registeredName(body);
+	if (name === '.memorybox') {
+		fakePermanent.memorybox = 'claimed';
+	} else if (name !== undefined) {
+		fakePermanent.memories.push(name);
+	}
+};
+
+const answerApi = (path: string, body: unknown): Response | undefined => {
 	switch (path) {
 		case '/folder/post':
 			fakePermanent.memorybox = 'empty';
@@ -174,19 +219,19 @@ const answerApi = (path: string): Response | undefined => {
 				},
 			});
 		case '/record/registerRecord':
-			fakePermanent.memorybox = 'claimed';
+			register(body);
 			return respond({ recordId: 30 });
 		default:
 			return undefined;
 	}
 };
 
-const answer = (url: string): Response | undefined => {
+const answer = (url: string, body: unknown): Response | undefined => {
 	if (url.startsWith(permanentStelaUrl)) {
 		return answerStela(url.slice(permanentStelaUrl.length));
 	}
 	if (url.startsWith(permanentApiUrl)) {
-		return answerApi(url.slice(permanentApiUrl.length));
+		return answerApi(url.slice(permanentApiUrl.length), body);
 	}
 	return undefined;
 };
@@ -200,13 +245,14 @@ const urlOf = (input: RequestInfo | URL): string => {
 
 export const fakePermanentFetch = async (
 	input: RequestInfo | URL,
+	init?: RequestInit,
 ): Promise<Response> => {
 	const url = urlOf(input);
 	const { failingPath } = fakePermanent;
 	if (failingPath !== undefined && url.includes(failingPath)) {
 		return await Promise.resolve(httpError(500));
 	}
-	const response = answer(url);
+	const response = answer(url, init?.body);
 	return response === undefined
 		? await Promise.reject(new Error(`Unstubbed request: ${url}`))
 		: await Promise.resolve(response);
