@@ -7,13 +7,14 @@ import {
 	jest,
 } from '@jest/globals';
 import { permanentApiUrl } from '../config';
-import { findRememberedDays, saveMemory } from './memories';
+import { findMemories, findRememberedDays, saveMemory } from './memories';
 import {
 	MEMORYBOX,
 	fakeFiles,
 	fakePermanent,
 	fakePermanentFetch,
 	resetFakePermanent,
+	thumbnailUrlOf,
 } from './testing';
 
 const fetchMock = jest.fn<typeof fetch>();
@@ -277,6 +278,122 @@ describe('findRememberedDays', () => {
 
 		expect(await findRememberedDays(session, MEMORYBOX)).toEqual({
 			outcome: 'signed-out',
+		});
+	});
+});
+
+describe('findMemories', () => {
+	it('finds each memory in the order of its day', async () => {
+		fakePermanent.memories = ['2026-09-30.heic', '2026-09-28.jpg'];
+
+		expect(await findMemories(session, MEMORYBOX)).toEqual({
+			outcome: 'found',
+			memories: [
+				{ day: '2026-09-28', imageUrl: thumbnailUrlOf('2026-09-28.jpg') },
+				{ day: '2026-09-30', imageUrl: thumbnailUrlOf('2026-09-30.heic') },
+			],
+		});
+	});
+
+	it('shows the largest thumbnail there is', async () => {
+		fetchMock
+			.mockResolvedValueOnce(
+				json({
+					items: [
+						{
+							...record('2026-09-30.jpg', '2026-09-30.jpg', '1'),
+							thumbnailUrls: {
+								'200': 'https://cdn.example.com/w200',
+								'1000': 'https://cdn.example.com/w1000',
+								'2000': null,
+							},
+						},
+					],
+					pagination: { nextCursor: '1' },
+				}),
+			)
+			.mockResolvedValueOnce(json({ items: [], pagination: {} }));
+
+		expect(await findMemories(session, MEMORYBOX)).toMatchObject({
+			memories: [{ imageUrl: 'https://cdn.example.com/w1000' }],
+		});
+	});
+
+	it('shows the 256 pixel thumbnail before the 200', async () => {
+		fetchMock
+			.mockResolvedValueOnce(
+				json({
+					items: [
+						{
+							...record('2026-09-30.jpg', '2026-09-30.jpg', '1'),
+							thumbnailUrls: {
+								'200': 'https://cdn.example.com/w200',
+								'256': 'https://cdn.example.com/w256',
+							},
+						},
+					],
+					pagination: { nextCursor: '1' },
+				}),
+			)
+			.mockResolvedValueOnce(json({ items: [], pagination: {} }));
+
+		expect(await findMemories(session, MEMORYBOX)).toMatchObject({
+			memories: [{ imageUrl: 'https://cdn.example.com/w256' }],
+		});
+	});
+
+	it('shows the original until there is a thumbnail', async () => {
+		fetchMock
+			.mockResolvedValueOnce(
+				json({
+					items: [
+						{
+							...record('2026-09-30.jpg', '2026-09-30.jpg', '1'),
+							thumbnailUrls: { width256Status: 'processing' },
+							files: [
+								{
+									format: 'file.format.converted',
+									fileUrl: 'https://cdn.example.com/converted',
+								},
+								{
+									format: 'file.format.original',
+									fileUrl: 'https://cdn.example.com/original',
+								},
+							],
+						},
+					],
+					pagination: { nextCursor: '1' },
+				}),
+			)
+			.mockResolvedValueOnce(json({ items: [], pagination: {} }));
+
+		expect(await findMemories(session, MEMORYBOX)).toMatchObject({
+			memories: [{ imageUrl: 'https://cdn.example.com/original' }],
+		});
+	});
+
+	it('keeps a memory that has no picture yet', async () => {
+		fetchMock
+			.mockResolvedValueOnce(
+				json({
+					items: [record('2026-09-30.jpg', '2026-09-30.jpg', '1')],
+					pagination: { nextCursor: '1' },
+				}),
+			)
+			.mockResolvedValueOnce(json({ items: [], pagination: {} }));
+
+		expect(await findMemories(session, MEMORYBOX)).toEqual({
+			outcome: 'found',
+			memories: [{ day: '2026-09-30', imageUrl: undefined }],
+		});
+	});
+
+	it('explains a folder it cannot read', async () => {
+		fakePermanent.failingPath = '/folders/';
+
+		expect(await findMemories(session, MEMORYBOX)).toEqual({
+			outcome: 'failed',
+			detail: 'HTTP 500',
 		});
 	});
 });

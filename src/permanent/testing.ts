@@ -137,10 +137,14 @@ const recordItem = (
 	folderLinkId: string,
 ): Item => ({ itemType: 'record', displayName, uploadFileName, folderLinkId });
 
+export const thumbnailUrlOf = (memoryName: string): string =>
+	`https://cdn.example.com/${memoryName}.thumb.w2000`;
+
 const memoryItems = (): Item[] =>
-	fakePermanent.memories.map((name, index) =>
-		recordItem(name, name, String(200 + index)),
-	);
+	fakePermanent.memories.map((name, index) => ({
+		...recordItem(name, name, String(200 + index)),
+		thumbnailUrls: { '2000': thumbnailUrlOf(name) },
+	}));
 
 const memoryboxContents = (): Item[] => {
 	switch (fakePermanent.memorybox) {

@@ -25,6 +25,7 @@ export type RememberState =
 	| { step: 'failed'; detail: string }
 	| { step: 'save-failed'; detail: string }
 	| { step: 'remembered' }
+	| { step: 'reminiscing' }
 	| { step: 'signed-out' };
 
 export type RememberAction =
@@ -32,7 +33,9 @@ export type RememberAction =
 	| { type: 'check-again' }
 	| { type: 'photos'; result: PhotosResult }
 	| { type: 'saved'; result: SaveMemoryResult }
-	| { type: 'start-over' };
+	| { type: 'start-over' }
+	| { type: 'reminisce' }
+	| { type: 'stop-reminiscing' };
 
 export const INITIAL_STATE: RememberState = { step: 'checking' };
 
@@ -91,6 +94,10 @@ export const rememberReducer = (
 			return afterSave(action.result);
 		case 'start-over':
 			return { step: 'start' };
+		case 'reminisce':
+			return { step: 'reminiscing' };
+		case 'stop-reminiscing':
+			return { step: 'already-remembered' };
 	}
 };
 
@@ -100,6 +107,8 @@ interface RememberFlow {
 	capture: (photo: Photo) => Promise<void>;
 	startOver: () => void;
 	checkAgain: () => void;
+	reminisce: () => void;
+	stopReminiscing: () => void;
 }
 
 export const useRememberFlow = (
@@ -183,5 +192,21 @@ export const useRememberFlow = (
 		dispatch({ type: 'check-again' });
 	};
 
-	return { state, findPhotos, capture, startOver, checkAgain };
+	const reminisce = (): void => {
+		dispatch({ type: 'reminisce' });
+	};
+
+	const stopReminiscing = (): void => {
+		dispatch({ type: 'stop-reminiscing' });
+	};
+
+	return {
+		state,
+		findPhotos,
+		capture,
+		startOver,
+		checkAgain,
+		reminisce,
+		stopReminiscing,
+	};
 };

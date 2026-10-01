@@ -13,18 +13,24 @@ interface RememberFlowProps {
 	session: Session;
 	memorybox: Folder;
 	onSignedOut: () => void;
+	renderReminisce: (onBack: () => void) => ReactElement;
 }
 
 export const RememberFlow = ({
 	session,
 	memorybox,
 	onSignedOut,
+	renderReminisce,
 }: RememberFlowProps): ReactElement => {
-	const { state, findPhotos, capture, startOver, checkAgain } = useRememberFlow(
-		session,
-		memorybox,
-		onSignedOut,
-	);
+	const {
+		state,
+		findPhotos,
+		capture,
+		startOver,
+		checkAgain,
+		reminisce,
+		stopReminiscing,
+	} = useRememberFlow(session, memorybox, onSignedOut);
 
 	switch (state.step) {
 		case 'checking':
@@ -39,7 +45,7 @@ export const RememberFlow = ({
 				/>
 			);
 		case 'already-remembered':
-			return <AlreadyRememberedScreen />;
+			return <AlreadyRememberedScreen onReminisce={reminisce} />;
 		case 'start':
 			return <StartScreen onRemember={findPhotos} />;
 		case 'choosing':
@@ -76,6 +82,8 @@ export const RememberFlow = ({
 				/>
 			);
 		case 'remembered':
-			return <RememberedScreen />;
+			return <RememberedScreen onReminisce={reminisce} />;
+		case 'reminiscing':
+			return renderReminisce(stopReminiscing);
 	}
 };

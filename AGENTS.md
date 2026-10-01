@@ -23,8 +23,10 @@ its backend, and makes sure the Memorybox folder exists in their default
 archive's My Files. It then checks that folder for a memory named for today.
 If there is none, it lets them pick one of the photos they took today and
 capture it as a memory, which uploads the photo to that folder as
-`yyyy-mm-dd.<format>`, named for the day it was taken. The app
-keeps the session in the platform's secure storage, so a returning user skips
+`yyyy-mm-dd.<format>`, named for the day it was taken. Once today is
+remembered, they can reminisce, which shows one of their earlier memories at
+random.
+The app keeps the session in the platform's secure storage, so a returning user skips
 the login screen until the token expires. There is no way to log out yet (#21).
 There is no deployment workflow yet.
 
@@ -55,6 +57,12 @@ a post of that form to S3, then `/record/registerRecord`. The S3 post goes
 through `expo-file-system`, which streams the file from disk natively rather
 than loading it into JavaScript. Text to upload is written to the cache first,
 so every upload takes the same path.
+
+Showing a photo takes no call of its own. Each record in a folder listing
+carries `thumbnailUrls` by width, and `files` with the original's `fileUrl`.
+Both are signed CloudFront URLs, so an `<Image>` loads them without the
+`Bearer` header. A new upload has no thumbnails until Permanent makes them, so
+the app shows the original until then.
 
 **The Memorybox folder.** After sign-in, `prepareMemorybox` finds or creates a
 folder named `Memorybox` in My Files. A folder the app creates gets a
@@ -179,6 +187,7 @@ src/
 ├── components/                        # The component library
 ├── features/
 │   ├── remember/                      # Choosing a photo and capturing it
+│   ├── reminisce/                     # Looking back through the memories
 │   ├── set-up/                        # Preparing the Memorybox folder
 │   └── sign-in/                       # The sign-in flow: its state and screens
 ├── permanent/                         # The Permanent API client

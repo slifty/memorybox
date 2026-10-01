@@ -1,5 +1,5 @@
 import { getFromStela, idAt, isValues, postVersionTwo, stringAt } from './api';
-import type { Attempt } from './api';
+import type { Attempt, Values } from './api';
 import type { Session } from './auth';
 
 export interface Folder {
@@ -13,12 +13,32 @@ export type Child =
 			type: string | undefined;
 			folder: Folder;
 	  }
-	| { kind: 'record'; name: string | undefined; fileName: string | undefined }
+	| {
+			kind: 'record';
+			name: string | undefined;
+			fileName: string | undefined;
+			imageUrl: string | undefined;
+	  }
 	| { kind: 'unreadable' };
 
 const PAGE_SIZE = 500;
 
 const MY_FILES_TYPE = 'private-root';
+
+const THUMBNAIL_WIDTHS_LARGEST_FIRST = ['2000', '1000', '500', '256', '200'];
+
+const ORIGINAL_FORMAT = 'file.format.original';
+
+const imageUrlOf = (item: Values): string | undefined => {
+	const thumbnailUrl = THUMBNAIL_WIDTHS_LARGEST_FIRST.map((width) =>
+		stringAt(item.thumbnailUrls, width),
+	).find((url) => url !== undefined);
+	const files: unknown[] = Array.isArray(item.files) ? item.files : [];
+	const original = files.find(
+		(file) => stringAt(file, 'format') === ORIGINAL_FORMAT,
+	);
+	return thumbnailUrl ?? stringAt(original, 'fileUrl');
+};
 
 const toChild = (item: unknown): Child => {
 	if (!isValues(item)) {
@@ -26,7 +46,12 @@ const toChild = (item: unknown): Child => {
 	}
 	const name = stringAt(item, 'displayName');
 	if (item.itemType === 'record') {
-		return { kind: 'record', name, fileName: stringAt(item, 'uploadFileName') };
+		return {
+			kind: 'record',
+			name,
+			fileName: stringAt(item, 'uploadFileName'),
+			imageUrl: imageUrlOf(item),
+		};
 	}
 	const folderId = idAt(item, 'folderId');
 	return item.itemType === 'folder' && folderId !== undefined
