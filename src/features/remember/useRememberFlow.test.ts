@@ -9,7 +9,40 @@ const choosing: RememberState = { step: 'choosing', photos: [photo] };
 const afterPhotos = (result: PhotosResult): RememberState =>
 	rememberReducer(INITIAL_STATE, { type: 'photos', result });
 
+const afterCheck = (days: string[]): RememberState =>
+	rememberReducer(INITIAL_STATE, {
+		type: 'checked',
+		result: { outcome: 'found', days },
+		today: '2026-09-30',
+	});
+
 describe('rememberReducer', () => {
+	it('offers to remember a day without a memory', () => {
+		expect(afterCheck(['2026-09-29'])).toEqual({ step: 'start' });
+	});
+
+	it('says so when today is already remembered', () => {
+		expect(afterCheck(['2026-09-29', '2026-09-30'])).toEqual({
+			step: 'already-remembered',
+		});
+	});
+
+	it('explains a failure to check', () => {
+		expect(
+			rememberReducer(INITIAL_STATE, {
+				type: 'checked',
+				result: { outcome: 'failed', detail: 'HTTP 500' },
+				today: '2026-09-30',
+			}),
+		).toEqual({ step: 'check-failed', detail: 'HTTP 500' });
+	});
+
+	it('checks again when asked', () => {
+		expect(
+			rememberReducer({ step: 'already-remembered' }, { type: 'check-again' }),
+		).toEqual(INITIAL_STATE);
+	});
+
 	it('offers the photos found', () => {
 		expect(afterPhotos({ outcome: 'found', photos: [photo] })).toEqual(
 			choosing,
@@ -48,12 +81,12 @@ describe('rememberReducer', () => {
 				type: 'saved',
 				result: { outcome: 'failed', detail: 'HTTP 500' },
 			}),
-		).toEqual({ step: 'failed', detail: 'HTTP 500' });
+		).toEqual({ step: 'save-failed', detail: 'HTTP 500' });
 	});
 
-	it('starts over from any step', () => {
-		expect(rememberReducer(choosing, { type: 'start-over' })).toEqual(
-			INITIAL_STATE,
-		);
+	it('starts over without checking again', () => {
+		expect(rememberReducer(choosing, { type: 'start-over' })).toEqual({
+			step: 'start',
+		});
 	});
 });

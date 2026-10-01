@@ -1,6 +1,7 @@
+import { listChildren } from './folders';
 import { uploadDeviceFile } from './records';
 import type { Session } from './auth';
-import type { Folder } from './folders';
+import type { Child, Folder } from './folders';
 
 export interface Memory {
 	photoUri: string;
@@ -34,7 +35,7 @@ const extensionOf = (uri: string): string | undefined => {
 
 const twoDigits = (value: number): string => String(value).padStart(2, '0');
 
-const dayOf = (timeMs: number): string => {
+export const dayOf = (timeMs: number): string => {
 	const time = new Date(timeMs);
 	return [
 		String(time.getFullYear()),
@@ -60,4 +61,55 @@ export const saveMemory = async (
 	return uploaded.ok
 		? { outcome: 'saved' }
 		: { outcome: 'failed', detail: uploaded.detail };
+};
+
+export type RememberedDaysResult =
+	{ outcome: 'found'; days: string[] } | { outcome: 'failed'; detail: string };
+
+const DAY_PART_LENGTHS = [4, 2, 2];
+
+const DIGITS = '0123456789';
+
+const isDigits = (text: string): boolean =>
+	text !== '' &&
+	Array.from({ length: text.length }, (_, index) => text.charAt(index)).every(
+		(character) => DIGITS.includes(character),
+	);
+
+const dayIn = (name: string | undefined): string | undefined => {
+	const [day = ''] = (name ?? '').split('.');
+	const parts = day.split('-');
+	const isDay =
+		parts.length === DAY_PART_LENGTHS.length &&
+		parts.every(
+			(part, index) =>
+				isDigits(part) && part.length === DAY_PART_LENGTHS[index],
+		);
+	return isDay ? day : undefined;
+};
+
+const isUnreadable = (child: Child): boolean =>
+	child.kind === 'unreadable' ||
+	(child.kind === 'record' &&
+		child.name === undefined &&
+		child.fileName === undefined);
+
+const rememberedDayOf = (child: Child): string | undefined =>
+	child.kind === 'record' ? dayIn(child.name ?? child.fileName) : undefined;
+
+export const findRememberedDays = async (
+	session: Session,
+	memorybox: Folder,
+): Promise<RememberedDaysResult> => {
+	const children = await listChildren(session, memorybox);
+	if (!children.ok) {
+		return { outcome: 'failed', detail: children.detail };
+	}
+	if (children.value.some(isUnreadable)) {
+		return { outcome: 'failed', detail: 'Unreadable memory in Memorybox' };
+	}
+	const days = children.value
+		.map(rememberedDayOf)
+		.filter((day) => day !== undefined);
+	return { outcome: 'found', days: [...new Set(days)] };
 };

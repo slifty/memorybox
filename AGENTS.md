@@ -20,7 +20,8 @@ For specific dependency versions, consult `package.json`.
 
 **Status:** the app logs a user in to [Permanent](https://www.permanent.org),
 its backend, and makes sure the Memorybox folder exists in their default
-archive's My Files. It then lets them pick one of the photos they took today and
+archive's My Files. It then checks that folder for a memory named for today.
+If there is none, it lets them pick one of the photos they took today and
 capture it as a memory, which uploads the photo to that folder as
 `yyyy-mm-dd.<format>`, named for the day it was taken. The app
 keeps the access token in memory only, so a restart means logging in again (#8

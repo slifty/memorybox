@@ -107,6 +107,38 @@ describe('listChildren', () => {
 		});
 	});
 
+	it('refuses a full page that gives no way to the next', async () => {
+		fetchMock.mockResolvedValueOnce(
+			json({
+				items: Array.from({ length: 500 }, (_, index) => ({
+					itemType: 'record',
+					displayName: `Record ${String(index)}`,
+					folderLinkId: String(index),
+				})),
+				pagination: {},
+			}),
+		);
+
+		expect(await listChildren(session, MY_FILES)).toEqual({
+			ok: false,
+			detail: 'Folder contents were cut short',
+		});
+	});
+
+	it('refuses a cursor it cannot send back', async () => {
+		fetchMock.mockResolvedValueOnce(
+			json({
+				items: [{ itemType: 'record', displayName: 'A', folderLinkId: '1' }],
+				pagination: { nextCursor: '\ud800' },
+			}),
+		);
+
+		expect(await listChildren(session, MY_FILES)).toEqual({
+			ok: false,
+			detail: 'Unreadable folder cursor',
+		});
+	});
+
 	it('explains contents it cannot read', async () => {
 		fetchMock.mockResolvedValueOnce(json({ error: 'Nope' }));
 

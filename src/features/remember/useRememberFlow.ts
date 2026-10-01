@@ -1,25 +1,51 @@
-import { useReducer, useRef } from 'react';
-import { saveMemory } from '../../permanent/memories';
+import { useEffect, useReducer, useRef } from 'react';
+import { AppState } from 'react-native';
+import {
+	dayOf,
+	findRememberedDays,
+	saveMemory,
+} from '../../permanent/memories';
 import { findTodaysPhotos } from '../../photos/library';
 import type { Session } from '../../permanent/auth';
 import type { Folder } from '../../permanent/folders';
-import type { SaveMemoryResult } from '../../permanent/memories';
+import type {
+	RememberedDaysResult,
+	SaveMemoryResult,
+} from '../../permanent/memories';
 import type { Photo, PhotosResult } from '../../photos/library';
 
 export type RememberState =
+	| { step: 'checking' }
+	| { step: 'check-failed'; detail: string }
+	| { step: 'already-remembered' }
 	| { step: 'start' }
 	| { step: 'choosing'; photos: Photo[] }
 	| { step: 'no-photos' }
 	| { step: 'denied' }
 	| { step: 'failed'; detail: string }
+	| { step: 'save-failed'; detail: string }
 	| { step: 'remembered' };
 
 export type RememberAction =
+	| { type: 'checked'; result: RememberedDaysResult; today: string }
+	| { type: 'check-again' }
 	| { type: 'photos'; result: PhotosResult }
 	| { type: 'saved'; result: SaveMemoryResult }
 	| { type: 'start-over' };
 
-export const INITIAL_STATE: RememberState = { step: 'start' };
+export const INITIAL_STATE: RememberState = { step: 'checking' };
+
+const afterCheck = (
+	result: RememberedDaysResult,
+	today: string,
+): RememberState => {
+	if (result.outcome === 'failed') {
+		return { step: 'check-failed', detail: result.detail };
+	}
+	return result.days.includes(today)
+		? { step: 'already-remembered' }
+		: { step: 'start' };
+};
 
 const afterPhotos = (result: PhotosResult): RememberState => {
 	switch (result.outcome) {
@@ -37,19 +63,23 @@ const afterPhotos = (result: PhotosResult): RememberState => {
 const afterSave = (result: SaveMemoryResult): RememberState =>
 	result.outcome === 'saved'
 		? { step: 'remembered' }
-		: { step: 'failed', detail: result.detail };
+		: { step: 'save-failed', detail: result.detail };
 
 export const rememberReducer = (
 	_state: RememberState,
 	action: RememberAction,
 ): RememberState => {
 	switch (action.type) {
+		case 'checked':
+			return afterCheck(action.result, action.today);
+		case 'check-again':
+			return INITIAL_STATE;
 		case 'photos':
 			return afterPhotos(action.result);
 		case 'saved':
 			return afterSave(action.result);
 		case 'start-over':
-			return INITIAL_STATE;
+			return { step: 'start' };
 	}
 };
 
@@ -58,6 +88,7 @@ interface RememberFlow {
 	findPhotos: () => Promise<void>;
 	capture: (photo: Photo) => Promise<void>;
 	startOver: () => void;
+	checkAgain: () => void;
 }
 
 export const useRememberFlow = (
@@ -66,6 +97,37 @@ export const useRememberFlow = (
 ): RememberFlow => {
 	const [state, dispatch] = useReducer(rememberReducer, INITIAL_STATE);
 	const attemptRef = useRef(0);
+	const checking = state.step === 'checking';
+	const alreadyRemembered = state.step === 'already-remembered';
+
+	useEffect(() => {
+		if (!alreadyRemembered) {
+			return undefined;
+		}
+		const subscription = AppState.addEventListener('change', (appState) => {
+			if (appState === 'active') {
+				dispatch({ type: 'check-again' });
+			}
+		});
+		return (): void => {
+			subscription.remove();
+		};
+	}, [alreadyRemembered]);
+
+	useEffect(() => {
+		if (!checking) {
+			return undefined;
+		}
+		let abandoned = false;
+		void findRememberedDays(session, memorybox).then((result) => {
+			if (!abandoned) {
+				dispatch({ type: 'checked', result, today: dayOf(Date.now()) });
+			}
+		});
+		return (): void => {
+			abandoned = true;
+		};
+	}, [session, memorybox, checking]);
 
 	const run = async (request: () => Promise<RememberAction>): Promise<void> => {
 		attemptRef.current += 1;
@@ -98,5 +160,9 @@ export const useRememberFlow = (
 		dispatch({ type: 'start-over' });
 	};
 
-	return { state, findPhotos, capture, startOver };
+	const checkAgain = (): void => {
+		dispatch({ type: 'check-again' });
+	};
+
+	return { state, findPhotos, capture, startOver, checkAgain };
 };

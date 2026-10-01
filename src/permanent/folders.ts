@@ -45,13 +45,26 @@ interface Listing {
 	cursorsSeen: ReadonlySet<string>;
 }
 
+const cursorQuery = (cursor: string | undefined): string | undefined => {
+	if (cursor === undefined) {
+		return '';
+	}
+	try {
+		return `&cursor=${encodeURIComponent(cursor)}`;
+	} catch {
+		return undefined;
+	}
+};
+
 const listFrom = async (
 	session: Session,
 	parent: Folder,
 	{ cursor, children: earlier, cursorsSeen }: Listing,
 ): Promise<Attempt<Child[]>> => {
-	const after =
-		cursor === undefined ? '' : `&cursor=${encodeURIComponent(cursor)}`;
+	const after = cursorQuery(cursor);
+	if (after === undefined) {
+		return { ok: false, detail: 'Unreadable folder cursor' };
+	}
 	const reply = await getFromStela(
 		session.token,
 		`/folders/${parent.folderId}/children?pageSize=${String(PAGE_SIZE)}${after}`,
@@ -69,7 +82,9 @@ const listFrom = async (
 	const nextCursor =
 		items.length === 0 ? undefined : idAt(pagination, 'nextCursor');
 	if (nextCursor === undefined) {
-		return { ok: true, value: children };
+		return items.length < PAGE_SIZE
+			? { ok: true, value: children }
+			: { ok: false, detail: 'Folder contents were cut short' };
 	}
 	return cursorsSeen.has(nextCursor)
 		? { ok: false, detail: 'Folder contents did not advance' }
