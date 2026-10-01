@@ -108,4 +108,16 @@ describe('rememberReducer', () => {
 			step: 'start',
 		});
 	});
+
+	it('reminisces, and comes back to the remembered day', () => {
+		const reminiscing = rememberReducer(
+			{ step: 'already-remembered' },
+			{ type: 'reminisce' },
+		);
+
+		expect(reminiscing).toEqual({ step: 'reminiscing' });
+		expect(rememberReducer(reminiscing, { type: 'stop-reminiscing' })).toEqual({
+			step: 'already-remembered',
+		});
+	});
 });

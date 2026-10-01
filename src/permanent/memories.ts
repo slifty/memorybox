@@ -71,6 +71,14 @@ export const saveMemory = async (
 export type RememberedDaysResult =
 	{ outcome: 'found'; days: string[] } | Failed;
 
+export interface SavedMemory {
+	day: string;
+	imageUrl: string | undefined;
+}
+
+export type MemoriesResult =
+	{ outcome: 'found'; memories: SavedMemory[] } | Failed;
+
 const DAY_PART_LENGTHS = [4, 2, 2];
 
 const DIGITS = '0123456789';
@@ -99,13 +107,18 @@ const isUnreadable = (child: Child): boolean =>
 		child.name === undefined &&
 		child.fileName === undefined);
 
-const rememberedDayOf = (child: Child): string | undefined =>
-	child.kind === 'record' ? dayIn(child.name ?? child.fileName) : undefined;
+const savedMemoryOf = (child: Child): SavedMemory[] => {
+	if (child.kind !== 'record') {
+		return [];
+	}
+	const day = dayIn(child.name ?? child.fileName);
+	return day === undefined ? [] : [{ day, imageUrl: child.imageUrl }];
+};
 
-export const findRememberedDays = async (
+export const findMemories = async (
 	session: Session,
 	memorybox: Folder,
-): Promise<RememberedDaysResult> => {
+): Promise<MemoriesResult> => {
 	const children = await listChildren(session, memorybox);
 	if (!children.ok) {
 		return failed(children);
@@ -113,8 +126,21 @@ export const findRememberedDays = async (
 	if (children.value.some(isUnreadable)) {
 		return { outcome: 'failed', detail: 'Unreadable memory in Memorybox' };
 	}
-	const days = children.value
-		.map(rememberedDayOf)
-		.filter((day) => day !== undefined);
-	return { outcome: 'found', days: [...new Set(days)] };
+	const memories = children.value
+		.flatMap(savedMemoryOf)
+		.sort((first, second) => first.day.localeCompare(second.day));
+	return { outcome: 'found', memories };
+};
+
+export const findRememberedDays = async (
+	session: Session,
+	memorybox: Folder,
+): Promise<RememberedDaysResult> => {
+	const found = await findMemories(session, memorybox);
+	return found.outcome === 'found'
+		? {
+				outcome: 'found',
+				days: [...new Set(found.memories.map(({ day }) => day))],
+			}
+		: found;
 };

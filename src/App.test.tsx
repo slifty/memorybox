@@ -96,6 +96,9 @@ const rememberTodayAndTomorrow = (): void => {
 const findRemember = async (): Promise<unknown> =>
 	await screen.findByRole('button', { name: 'Remember' });
 
+const findReminisce = async (): Promise<unknown> =>
+	await screen.findByRole('button', { name: 'Reminisce' });
+
 const remember = async (): Promise<ReturnType<typeof userEvent.setup>> => {
 	fetchMock.mockResolvedValueOnce(loginSuccess());
 	const user = await logIn();
@@ -240,20 +243,52 @@ describe('App', () => {
 		rememberTodayAndTomorrow();
 		await user.press(screen.getByRole('button', { name: 'Back' }));
 
-		expect(await screen.findByText('Today is remembered.')).toBeOnTheScreen();
+		expect(await findReminisce()).toBeOnTheScreen();
 		await expectPaletteAfterFade('gray');
 	});
 
-	it('says when today is already remembered', async () => {
+	it('only offers to reminisce when today is already remembered', async () => {
 		rememberTodayAndTomorrow();
 		fetchMock.mockResolvedValueOnce(loginSuccess());
 		await logIn();
 
-		expect(await screen.findByText('Today is remembered.')).toBeOnTheScreen();
+		expect(await findReminisce()).toBeOnTheScreen();
 		expect(
 			screen.queryByRole('button', { name: 'Remember' }),
 		).not.toBeOnTheScreen();
 		await expectPaletteAfterFade('gray');
+	});
+
+	it('reminisces, and comes back to the remembered day', async () => {
+		rememberTodayAndTomorrow();
+		fakePermanent.memories.push(`${dayOf(Date.now() - ONE_DAY_MS)}.jpg`);
+		fetchMock.mockResolvedValueOnce(loginSuccess());
+		const user = await logIn();
+		expect(await findReminisce()).toBeOnTheScreen();
+		await expectPaletteAfterFade('gray');
+
+		await user.press(screen.getByRole('button', { name: 'Reminisce' }));
+		expect(await screen.findByLabelText(/^Memory from /v)).toBeOnTheScreen();
+
+		await user.press(screen.getByRole('button', { name: 'Back' }));
+		expect(await findReminisce()).toBeOnTheScreen();
+	});
+
+	it('reminisces right after remembering', async () => {
+		fakeLibrary.photos = [photoTakenAt(today(9, 15))];
+		const user = await remember();
+		await user.press(
+			await screen.findByRole('button', { name: /Photo taken at 9:15/v }),
+		);
+		await user.press(screen.getByRole('button', { name: 'Capture Memory' }));
+		expect(await screen.findByText('Done.')).toBeOnTheScreen();
+		await expectPaletteAfterFade('gray');
+
+		await user.press(screen.getByRole('button', { name: 'Reminisce' }));
+
+		expect(
+			await screen.findByText('There are no earlier memories yet.'),
+		).toBeOnTheScreen();
 	});
 
 	it('checks again when it comes back to the foreground', async () => {
@@ -267,7 +302,7 @@ describe('App', () => {
 		rememberTodayAndTomorrow();
 		fetchMock.mockResolvedValueOnce(loginSuccess());
 		await logIn();
-		expect(await screen.findByText('Today is remembered.')).toBeOnTheScreen();
+		expect(await findReminisce()).toBeOnTheScreen();
 		await expectPaletteAfterFade('gray');
 
 		fakePermanent.memories = [];
