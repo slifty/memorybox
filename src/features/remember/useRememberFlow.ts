@@ -2,6 +2,7 @@ import { useReducer, useRef } from 'react';
 import { saveMemory } from '../../permanent/memories';
 import { findTodaysPhotos } from '../../photos/library';
 import type { Session } from '../../permanent/auth';
+import type { Folder } from '../../permanent/folders';
 import type { SaveMemoryResult } from '../../permanent/memories';
 import type { Photo, PhotosResult } from '../../photos/library';
 
@@ -59,7 +60,10 @@ interface RememberFlow {
 	startOver: () => void;
 }
 
-export const useRememberFlow = (session: Session): RememberFlow => {
+export const useRememberFlow = (
+	session: Session,
+	memorybox: Folder,
+): RememberFlow => {
 	const [state, dispatch] = useReducer(rememberReducer, INITIAL_STATE);
 	const attemptRef = useRef(0);
 
@@ -82,7 +86,10 @@ export const useRememberFlow = (session: Session): RememberFlow => {
 	const capture = async ({ uri, takenAtMs }: Photo): Promise<void> => {
 		await run(async () => ({
 			type: 'saved',
-			result: await saveMemory(session, { photoUri: uri, takenAtMs }),
+			result: await saveMemory(session, memorybox, {
+				photoUri: uri,
+				takenAtMs,
+			}),
 		}));
 	};
 

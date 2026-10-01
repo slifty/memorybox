@@ -1,14 +1,15 @@
 // Transport for Permanent's API: request envelopes, and reading the responses.
 //
-// Every request wraps its payload as `{ RequestVO: { data: [payload] } }`.
-// Every response is HTTP 200 with a body shaped like
+// A request through `post` wraps its payload as
+// `{ RequestVO: { data: [payload] } }`. Its response is HTTP 200 with a body
+// shaped like
 // `{ isSuccessful, Results: [{ message: [code], data: [values] }] }`, whether
 // or not the call succeeded; `message` holds codes such as
 // `warning.signin.unknown` when it did not.
 
 /* eslint-disable @typescript-eslint/naming-convention --
    Permanent's API names its fields in PascalCase (`RequestVO`, `Results`). */
-import { permanentApiUrl } from '../config';
+import { permanentApiUrl, permanentStelaUrl } from '../config';
 
 export type Values = Record<string, unknown>;
 
@@ -70,5 +71,83 @@ export const post = async (path: string, payload: Values): Promise<Reply> => {
 		return read(await response.json());
 	} catch (error) {
 		return { ok: false, code: undefined, detail: describe(error) };
+	}
+};
+
+export interface Failure {
+	ok: false;
+	detail: string;
+}
+
+export type Attempt<T> = { ok: true; value: T } | Failure;
+
+export type Done = { ok: true } | Failure;
+
+export const idAt = (values: unknown, key: string): string | undefined => {
+	if (!isValues(values)) {
+		return undefined;
+	}
+	const { [key]: value } = values;
+	if (typeof value === 'number' && Number.isFinite(value)) {
+		return String(value);
+	}
+	return typeof value === 'string' && value !== '' ? value : undefined;
+};
+
+const send = async (
+	url: string,
+	init: RequestInit,
+): Promise<Attempt<Values>> => {
+	try {
+		const response = await fetch(url, init);
+		if (!response.ok) {
+			return { ok: false, detail: `HTTP ${String(response.status)}` };
+		}
+		const body: unknown = await response.json();
+		return isValues(body)
+			? { ok: true, value: body }
+			: { ok: false, detail: 'Unreadable response' };
+	} catch (error) {
+		return { ok: false, detail: describe(error) };
+	}
+};
+
+const versionTwoHeaders = (token: string): Record<string, string> => ({
+	Authorization: `Bearer ${token}`,
+	'Content-Type': 'application/json',
+	'Request-Version': '2',
+});
+
+export const getFromStela = async (
+	token: string,
+	path: string,
+): Promise<Attempt<Values>> =>
+	await send(`${permanentStelaUrl}${path}`, {
+		headers: versionTwoHeaders(token),
+	});
+
+export const postVersionTwo = async (
+	token: string,
+	path: string,
+	body: Values,
+): Promise<Attempt<Values>> =>
+	await send(`${permanentApiUrl}${path}`, {
+		method: 'POST',
+		headers: versionTwoHeaders(token),
+		body: JSON.stringify(body),
+	});
+
+export const postForm = async (url: string, form: FormData): Promise<Done> => {
+	try {
+		const response = await fetch(url, {
+			method: 'POST',
+			credentials: 'omit',
+			body: form,
+		});
+		return response.ok
+			? { ok: true }
+			: { ok: false, detail: `HTTP ${String(response.status)}` };
+	} catch (error) {
+		return { ok: false, detail: describe(error) };
 	}
 };

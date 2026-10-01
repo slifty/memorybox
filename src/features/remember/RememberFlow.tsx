@@ -4,14 +4,22 @@ import { RememberedScreen } from './RememberedScreen';
 import { StartScreen } from './StartScreen';
 import { useRememberFlow } from './useRememberFlow';
 import type { Session } from '../../permanent/auth';
+import type { Folder } from '../../permanent/folders';
 import type { ReactElement } from 'react';
 
 interface RememberFlowProps {
 	session: Session;
+	memorybox: Folder;
 }
 
-export const RememberFlow = ({ session }: RememberFlowProps): ReactElement => {
-	const { state, findPhotos, capture, startOver } = useRememberFlow(session);
+export const RememberFlow = ({
+	session,
+	memorybox,
+}: RememberFlowProps): ReactElement => {
+	const { state, findPhotos, capture, startOver } = useRememberFlow(
+		session,
+		memorybox,
+	);
 
 	switch (state.step) {
 		case 'start':
