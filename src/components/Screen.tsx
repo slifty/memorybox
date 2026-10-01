@@ -1,5 +1,6 @@
 import { useEffect } from 'react';
 import { Animated, StyleSheet } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { theme } from '../theme';
 import { DEFAULT_PALETTE, usePalette } from './Palette';
 import type { PaletteName } from './Palette';
@@ -10,7 +11,6 @@ const styles = StyleSheet.create({
 		flex: 1,
 		justifyContent: 'center',
 		gap: theme.spacing.md,
-		padding: theme.spacing.lg,
 	},
 });
 
@@ -25,6 +25,7 @@ export const Screen = ({
 	palette = DEFAULT_PALETTE,
 }: ScreenProps): ReactElement => {
 	const { colors, show } = usePalette();
+	const insets = useSafeAreaInsets();
 
 	useEffect(() => {
 		show(palette);
@@ -32,7 +33,16 @@ export const Screen = ({
 
 	return (
 		<Animated.View
-			style={[styles.screen, { backgroundColor: colors.background }]}
+			style={[
+				styles.screen,
+				{
+					backgroundColor: colors.background,
+					paddingTop: theme.spacing.lg + insets.top,
+					paddingRight: theme.spacing.lg + insets.right,
+					paddingBottom: theme.spacing.lg + insets.bottom,
+					paddingLeft: theme.spacing.lg + insets.left,
+				},
+			]}
 			testID="screen"
 		>
 			{children}

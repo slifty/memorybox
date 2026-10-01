@@ -1,4 +1,8 @@
 import { StatusBar } from 'expo-status-bar';
+import {
+	SafeAreaProvider,
+	initialWindowMetrics,
+} from 'react-native-safe-area-context';
 import { PaletteProvider } from './components/Palette';
 import { RememberFlow } from './features/remember/RememberFlow';
 import { ReminisceFlow } from './features/reminisce/ReminisceFlow';
@@ -7,30 +11,32 @@ import { SignInFlow } from './features/sign-in/SignInFlow';
 import type { ReactElement } from 'react';
 
 export const App = (): ReactElement => (
-	<PaletteProvider>
-		<SignInFlow
-			renderSignedIn={(session, signOut) => (
-				<SetUpFlow
-					onSignedOut={signOut}
-					renderReady={(memorybox) => (
-						<RememberFlow
-							memorybox={memorybox}
-							onSignedOut={signOut}
-							renderReminisce={(onBack) => (
-								<ReminisceFlow
-									memorybox={memorybox}
-									onBack={onBack}
-									onSignedOut={signOut}
-									session={session}
-								/>
-							)}
-							session={session}
-						/>
-					)}
-					session={session}
-				/>
-			)}
-		/>
-		<StatusBar style="auto" />
-	</PaletteProvider>
+	<SafeAreaProvider initialMetrics={initialWindowMetrics}>
+		<PaletteProvider>
+			<SignInFlow
+				renderSignedIn={(session, signOut) => (
+					<SetUpFlow
+						onSignedOut={signOut}
+						renderReady={(memorybox) => (
+							<RememberFlow
+								memorybox={memorybox}
+								onSignedOut={signOut}
+								renderReminisce={(onBack) => (
+									<ReminisceFlow
+										memorybox={memorybox}
+										onBack={onBack}
+										onSignedOut={signOut}
+										session={session}
+									/>
+								)}
+								session={session}
+							/>
+						)}
+						session={session}
+					/>
+				)}
+			/>
+			<StatusBar style="auto" />
+		</PaletteProvider>
+	</SafeAreaProvider>
 );
